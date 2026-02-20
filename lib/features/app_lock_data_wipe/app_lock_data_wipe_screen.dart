@@ -1,7 +1,11 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:local_auth/local_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:sqflite/sqflite.dart';
+import 'package:path/path.dart' as p;
+import 'package:path_provider/path_provider.dart';
 import '../../core/constants/app_colors.dart';
 
 class AppLockDataWipeScreen extends StatefulWidget {
@@ -159,10 +163,47 @@ class _AppLockDataWipeScreenState extends State<AppLockDataWipeScreen> {
   }
 
   Future<void> _performWipe() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.clear();
-    await _secureStorage.deleteAll();
-    
+    try {
+      // 1. Clear all SharedPreferences
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.clear();
+
+      // 2. Clear secure storage
+      await _secureStorage.deleteAll();
+
+      // 3. Delete SQLite database
+      try {
+        final dbPath = p.join(await getDatabasesPath(), 'sos_history.db');
+        final dbFile = File(dbPath);
+        if (await dbFile.exists()) await dbFile.delete();
+      } catch (e) {
+        // DB may not exist yet
+      }
+
+      // 4. Delete evidence locker files
+      try {
+        final appDir = await getApplicationDocumentsDirectory();
+        final lockerDir = Directory('${appDir.path}/evidence_locker');
+        if (await lockerDir.exists()) await lockerDir.delete(recursive: true);
+      } catch (e) {
+        // Directory may not exist
+      }
+
+      // 5. Delete wrong-pin capture photos
+      try {
+        final tempDir = await getTemporaryDirectory();
+        for (final f in tempDir.listSync()) {
+          if (f.path.contains('intruder') || f.path.contains('capture')) {
+            await f.delete();
+          }
+        }
+      } catch (e) {
+        // Temp files may not exist
+      }
+    } catch (e) {
+      // Never crash on wipe failure
+    }
+
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(

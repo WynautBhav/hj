@@ -133,14 +133,24 @@ void onStart(ServiceInstance service) async {
     // FIX #8: If accelerometer not available, service continues safely
   }
 
+  // FIX #1: Shake watchdog — re-start listener every 5s if it stopped.
+  // Android may kill the accelerometer listener; this ensures it restarts.
+  Timer.periodic(const Duration(seconds: 5), (_) {
+    try {
+      if (!shakeService.isListening) {
+        shakeService.startListening();
+      }
+    } catch (e) {
+      // Never crash on watchdog
+    }
+  });
+
   // Keep-alive timer — updates notification info periodically
-  // FIX #6: Reduced from 2s to 10s to avoid aggressive polling
   Timer.periodic(const Duration(seconds: 10), (timer) async {
     if (service is AndroidServiceInstance) {
       try {
         if (await service.isForegroundService()) {
           service.setForegroundNotificationInfo(
-            // FIX #7: Clear notification text
             title: "🛡️ Medusa Active",
             content: "Safety monitoring is running.",
           );

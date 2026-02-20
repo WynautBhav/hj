@@ -113,9 +113,14 @@ class _MedusaTaskHandler extends TaskHandler {
 
   @override
   void onRepeatEvent(DateTime timestamp) {
-    // Keep-alive heartbeat — prevents Android from killing the service.
-    // Actual monitoring (shake, GPS, audio) runs in the main isolate
-    // via ShakeService, LocationService, etc.
+    // FIX #2: Send heartbeat to main isolate so it can check & re-arm
+    // voice SOS if it was killed. The main isolate listens via
+    // FlutterForegroundTask.addTaskDataCallback().
+    try {
+      FlutterForegroundTask.sendDataToMain('voice_sos_check');
+    } catch (e) {
+      // Main isolate may not be alive — that's OK
+    }
   }
 
   @override

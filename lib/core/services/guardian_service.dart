@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -36,7 +37,6 @@ class GuardianService {
     await prefs.setBool(_enabledKey, enabled);
   }
 
-  /// FIX #5: Request BT runtime permissions before scanning (Android 12+ requires this)
   Future<bool> _requestBluetoothPermissions() async {
     try {
       final btScan = await Permission.bluetoothScan.request();
@@ -57,7 +57,6 @@ class GuardianService {
   Future<void> startScan() async {
     if (_isScanning) return;
     
-    // FIX #5: Request runtime permissions before scanning
     final hasPermissions = await _requestBluetoothPermissions();
     if (!hasPermissions) return;
     
@@ -138,6 +137,32 @@ class GuardianService {
         _isConnected = true;
         onConnected?.call();
       }
+    }
+  }
+
+  /// FIX #8: Send SOS alert to connected guardian device via BLE GATT write.
+  /// Both devices must agree on the service/characteristic UUIDs.
+  Future<void> sendSosAlert({required String locationLink}) async {
+    if (_connectedDevice == null || !_isConnected) return;
+
+    try {
+      final services = await _connectedDevice!.discoverServices();
+      const serviceUuid = '0000ffe0-0000-1000-8000-00805f9b34fb';
+      const charUuid = '0000ffe1-0000-1000-8000-00805f9b34fb';
+
+      for (final service in services) {
+        if (service.uuid.toString().toLowerCase() == serviceUuid) {
+          for (final char in service.characteristics) {
+            if (char.uuid.toString().toLowerCase() == charUuid) {
+              final payload = 'SOS:${locationLink.substring(0, min(locationLink.length, 100))}';
+              await char.write(payload.codeUnits, withoutResponse: false);
+              return;
+            }
+          }
+        }
+      }
+    } catch (e) {
+      onError?.call('Guardian alert failed: $e');
     }
   }
 

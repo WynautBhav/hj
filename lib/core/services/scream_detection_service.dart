@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:record/record.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:path_provider/path_provider.dart';
 
 class ScreamDetectionService {
   static const String _enabledKey = 'scream_detection_enabled';
@@ -58,6 +59,20 @@ class ScreamDetectionService {
       if (!hasPermission) return;
       
       _isDetecting = true;
+
+      // FIX #3: The record package only emits amplitude events during
+      // an active recording session. Without start(), the stream emits
+      // nothing and scream detection is completely non-functional.
+      final tempDir = await getTemporaryDirectory();
+      await _recorder.start(
+        const RecordConfig(
+          encoder: AudioEncoder.aacLc,
+          bitRate: 16000,
+          sampleRate: 16000,
+          numChannels: 1,
+        ),
+        path: '${tempDir.path}/scream_monitor.aac',
+      );
       
       final stream = _recorder.onAmplitudeChanged(const Duration(milliseconds: 500));
       _amplitudeSubscription = stream.listen((amp) {

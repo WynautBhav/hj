@@ -16,8 +16,11 @@ import 'core/services/background_service.dart';
 import 'core/services/foreground_service.dart';
 import 'core/services/volume_sos_service.dart';
 import 'core/services/sos_state_manager.dart';
+import 'core/services/sos_history_service.dart';
+import 'core/services/scream_detection_service.dart';
 import 'features/voice_sos/services/voice_sos_service.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -67,7 +70,9 @@ class _MedusaAppState extends State<MedusaApp> with WidgetsBindingObserver {
   late ShakeService _shakeService;
   late PowerButtonService _powerButtonService;
   Timer? _bgCheckTimer;
-  bool _servicesStarted = false; // Prevents duplicate foreground service starts
+  bool _servicesStarted = false;
+  DateTime? _lastSosTrigger; // Debounce: no double-trigger within 10s
+  ScreamDetectionService? _screamService;
 
   @override
   void initState() {
@@ -79,11 +84,11 @@ class _MedusaAppState extends State<MedusaApp> with WidgetsBindingObserver {
   }
 
   void _startBackgroundListener() {
-    // FIX #6: Poll SharedPreferences for SOS/fake-call triggers from background.
-    // This is the ONLY bridge between the background isolate and the UI.
+    // Poll SharedPreferences for SOS/fake-call triggers from background (1s).
     _bgCheckTimer = Timer.periodic(const Duration(seconds: 1), (timer) async {
       try {
         final prefs = await SharedPreferences.getInstance();
+        await prefs.reload(); // Ensure fresh data from background isolate
         if (prefs.getBool('trigger_sos_now') == true) {
           await prefs.setBool('trigger_sos_now', false);
           _triggerSos();
@@ -93,9 +98,34 @@ class _MedusaAppState extends State<MedusaApp> with WidgetsBindingObserver {
           _triggerFakeCall();
         }
       } catch (e) {
-        // FIX #8: SharedPreferences can throw on concurrent access
+        // SharedPreferences can throw on concurrent access
       }
     });
+
+    // FIX #2: Listen for foreground task heartbeat to re-arm voice SOS
+    try {
+      FlutterForegroundTask.addTaskDataCallback((data) {
+        if (data == 'voice_sos_check') {
+          _checkAndRearmVoiceSos();
+        }
+      });
+    } catch (e) {
+      debugPrint('FG task callback setup failed: $e');
+    }
+  }
+
+  /// FIX #2: Called by foreground task heartbeat. Re-arms voice SOS
+  /// if it was armed but the listener died.
+  void _checkAndRearmVoiceSos() async {
+    try {
+      final voiceSos = VoiceSOSService();
+      if (voiceSos.isArmed && !voiceSos.isListening) {
+        await voiceSos.arm();
+        voiceSos.onPhraseDetected = (_) => _triggerSos();
+      }
+    } catch (e) {
+      // Never crash on heartbeat callback
+    }
   }
 
   @override
@@ -171,6 +201,18 @@ class _MedusaAppState extends State<MedusaApp> with WidgetsBindingObserver {
     } catch (e) {
       debugPrint('Volume SOS init failed: $e');
     }
+
+    // Start scream detection if enabled
+    try {
+      _screamService = ScreamDetectionService();
+      final screamEnabled = await _screamService!.isEnabled();
+      if (screamEnabled) {
+        _screamService!.onScreamDetected = _triggerSos;
+        await _screamService!.startListening();
+      }
+    } catch (e) {
+      debugPrint('Scream detection init failed: $e');
+    }
   }
 
   /// LIFECYCLE SAFETY: Only restart sensor listeners — never start FG service.
@@ -197,6 +239,19 @@ class _MedusaAppState extends State<MedusaApp> with WidgetsBindingObserver {
     } catch (e) {
       debugPrint('Voice SOS resume failed: $e');
     }
+
+    // Scream detection: re-arm if enabled
+    try {
+      if (_screamService != null) {
+        final screamEnabled = await _screamService!.isEnabled();
+        if (screamEnabled && !_screamService!.isActive) {
+          _screamService!.onScreamDetected = _triggerSos;
+          await _screamService!.startListening();
+        }
+      }
+    } catch (e) {
+      debugPrint('Scream re-arm failed: $e');
+    }
   }
 
   Future<void> _checkOnboarding() async {
@@ -213,18 +268,36 @@ class _MedusaAppState extends State<MedusaApp> with WidgetsBindingObserver {
   }
 
   void _triggerSos() {
-    if (mounted) {
-      Navigator.push(
-        context,
-        PageRouteBuilder(
-          pageBuilder: (_, __, ___) => const SosScreen(),
-          transitionsBuilder: (_, animation, __, child) {
-            return FadeTransition(opacity: animation, child: child);
-          },
-          transitionDuration: const Duration(milliseconds: 300),
-        ),
-      );
+    if (!mounted) return;
+
+    // Debounce: prevent double-trigger within 10 seconds
+    final now = DateTime.now();
+    if (_lastSosTrigger != null &&
+        now.difference(_lastSosTrigger!) < const Duration(seconds: 10)) {
+      return;
     }
+    _lastSosTrigger = now;
+
+    // Record SOS event in history
+    try {
+      SosHistoryService().recordSos(
+        triggerType: 'auto',
+        contactsNotified: 0,
+      );
+    } catch (e) {
+      // Never crash on history recording
+    }
+
+    Navigator.push(
+      context,
+      PageRouteBuilder(
+        pageBuilder: (_, __, ___) => const SosScreen(),
+        transitionsBuilder: (_, animation, __, child) {
+          return FadeTransition(opacity: animation, child: child);
+        },
+        transitionDuration: const Duration(milliseconds: 300),
+      ),
+    );
   }
 
   void _triggerFakeCall() {

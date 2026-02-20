@@ -402,45 +402,62 @@ class _FakeCallScreenState extends State<FakeCallScreen>
   // ────────────── REALISTIC CALL SCREEN ──────────────
 
   Widget _buildCallScreen() {
-    // Re-enforce immersive mode — prevents navbar leakage on some OEMs
+    // FIX #4: Re-enforce immersive mode — prevents navbar leakage on OEMs
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
-    return PopScope(
-      canPop: false,
-      child: Scaffold(
-        backgroundColor: const Color(0xFF0D0D1A),
-        body: Stack(
-          children: [
-            // Animated gradient background
-            Positioned.fill(
-              child: AnimatedBuilder(
-                animation: _waveController,
-                builder: (context, child) {
-                  return CustomPaint(
-                    painter: _CallWavePainter(
-                      progress: _waveController.value,
-                      isRinging: _isRinging,
-                    ),
-                  );
-                },
+    SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
+      systemNavigationBarColor: Color(0xFF0D0D1A),
+      systemNavigationBarDividerColor: Colors.transparent,
+      systemNavigationBarIconBrightness: Brightness.light,
+      statusBarColor: Colors.transparent,
+    ));
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: const SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        systemNavigationBarColor: Color(0xFF0D0D1A),
+        systemNavigationBarDividerColor: Colors.transparent,
+        systemNavigationBarIconBrightness: Brightness.light,
+      ),
+      child: PopScope(
+        canPop: false,
+        child: Material(
+          color: const Color(0xFF0D0D1A),
+          child: Stack(
+            children: [
+              // Animated gradient background
+              Positioned.fill(
+                child: AnimatedBuilder(
+                  animation: _waveController,
+                  builder: (context, child) {
+                    return CustomPaint(
+                      painter: _CallWavePainter(
+                        progress: _waveController.value,
+                        isRinging: _isRinging,
+                      ),
+                    );
+                  },
+                ),
               ),
-            ),
 
-            // Main call content
-            SafeArea(
-              child: Column(
-                children: [
-                  const SizedBox(height: 48),
+              // Main call content — manual padding instead of SafeArea
+              // to avoid status bar background colour mismatch
+              Padding(
+                padding: EdgeInsets.only(
+                  top: MediaQuery.of(context).padding.top + 16,
+                ),
+                child: Column(
+                  children: [
+                    const SizedBox(height: 48),
 
-                  // Call status text
-                  Text(
-                    _isRinging ? 'Incoming Call' : 'Connected',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
-                      color: Colors.white.withValues(alpha: 0.5),
-                      letterSpacing: 1.2,
+                    // Call status text
+                    Text(
+                      _isRinging ? 'Incoming Call' : 'Connected',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                        color: Colors.white.withValues(alpha: 0.5),
+                        letterSpacing: 1.2,
+                      ),
                     ),
-                  ),
                   
                   const SizedBox(height: 40),
                   
@@ -531,6 +548,7 @@ class _FakeCallScreenState extends State<FakeCallScreen>
             ),
           ],
         ),
+      ),
       ),
     );
   }
