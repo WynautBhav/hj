@@ -15,6 +15,8 @@ import 'features/fake_call/fake_call_screen.dart';
 import 'core/services/background_service.dart';
 import 'core/services/foreground_service.dart';
 import 'core/services/volume_sos_service.dart';
+import 'core/services/sos_state_manager.dart';
+import 'features/voice_sos/services/voice_sos_service.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 void main() async {
@@ -183,6 +185,18 @@ class _MedusaAppState extends State<MedusaApp> with WidgetsBindingObserver {
     } catch (e) {
       // Never crash on resume
     }
+
+    // Voice SOS: auto-resume if it was armed before app went to background
+    try {
+      final voiceSos = VoiceSOSService();
+      final wasArmed = await voiceSos.isServiceArmed();
+      if (wasArmed && !voiceSos.isListening) {
+        await voiceSos.arm();
+        voiceSos.onPhraseDetected = (_) => _triggerSos();
+      }
+    } catch (e) {
+      debugPrint('Voice SOS resume failed: $e');
+    }
   }
 
   Future<void> _checkOnboarding() async {
@@ -229,6 +243,10 @@ class _MedusaAppState extends State<MedusaApp> with WidgetsBindingObserver {
     // has passed calculator disguise and reached home screen.
     // This guarantees the app is in foreground state when service starts.
     _startProtectionServices();
+
+    // Load SOS state manager so UI can reflect armed status
+    SosStateManager().loadState();
+    SosStateManager().setServiceRunning(true);
 
     // Show battery optimization dialog once after first unlock
     _showBatteryOptimizationHint();

@@ -402,6 +402,8 @@ class _FakeCallScreenState extends State<FakeCallScreen>
   // ────────────── REALISTIC CALL SCREEN ──────────────
 
   Widget _buildCallScreen() {
+    // Re-enforce immersive mode — prevents navbar leakage on some OEMs
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
     return PopScope(
       canPop: false,
       child: Scaffold(
