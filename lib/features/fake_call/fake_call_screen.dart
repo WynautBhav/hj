@@ -74,6 +74,8 @@ class _FakeCallScreenState extends State<FakeCallScreen>
   }
 
   void _triggerRinging() {
+    // FIX #4: Enable immersive mode for realistic call screen
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
     setState(() {
       _isCallActive = true;
       _isRinging = true;
@@ -133,6 +135,8 @@ class _FakeCallScreenState extends State<FakeCallScreen>
     _delayTimer?.cancel();
     _audioService.stopRingtone();
     _nameCtrl.dispose();
+    // FIX #4: Restore system UI when leaving call screen
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     super.dispose();
   }
 

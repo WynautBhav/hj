@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../../core/constants/app_colors.dart';
+
 import '../../core/services/contact_service.dart';
 import '../../core/services/location_service.dart';
 import '../../core/services/flashlight_service.dart';
@@ -16,7 +16,8 @@ class SosScreen extends StatefulWidget {
   State<SosScreen> createState() => _SosScreenState();
 }
 
-class _SosScreenState extends State<SosScreen> with SingleTickerProviderStateMixin {
+// FIX #1: TickerProviderStateMixin required when using multiple AnimationControllers
+class _SosScreenState extends State<SosScreen> with TickerProviderStateMixin {
   bool _isActivating = false;
   int _countdown = 5;
   Timer? _timer;

@@ -271,14 +271,12 @@ class HomeContent extends StatefulWidget {
 }
 
 class _HomeContentState extends State<HomeContent> with SingleTickerProviderStateMixin {
-  List<Contact> _contacts = [];
   late AnimationController _gaugeController;
   late Animation<double> _gaugeAnimation;
 
   @override
   void initState() {
     super.initState();
-    _loadContacts();
     
     _gaugeController = AnimationController(
       vsync: this,
@@ -298,11 +296,6 @@ class _HomeContentState extends State<HomeContent> with SingleTickerProviderStat
   void dispose() {
     _gaugeController.dispose();
     super.dispose();
-  }
-
-  Future<void> _loadContacts() async {
-    final contacts = await ContactService().getContacts();
-    if (mounted) setState(() => _contacts = contacts);
   }
 
   String _greeting() {
@@ -347,7 +340,8 @@ class _HomeContentState extends State<HomeContent> with SingleTickerProviderStat
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          '$_greeting 👋',
+          // FIX #6: Must CALL _greeting(), not reference it as '$_greeting'
+          '${_greeting()} 👋',
           style: TextStyle(
             fontSize: 15,
             color: AppColors.textSecondary,
