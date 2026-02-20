@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Calculator body -->
+    <path
+        android:fillColor="#37474F"
+        android:pathData="M24,28h60c2.2,0 4,1.8 4,4v44c0,2.2 -1.8,4 -4,4H24c-2.2,0 -4,-1.8 -4,-4V32c0,-2.2 1.8,-4 4,-4z"/>
+
+    <!-- Display area -->
+    <path
+        android:fillColor="#CFD8DC"
+        android:pathData="M28,34h52v14H28z"/>
+
+    <!-- Display text -->
+    <path
+        android:fillColor="#37474F"
+        android:pathData="M68,40h8v2h-8zM60,40h6v2h-6zM52,40h6v2h-6z"/>
+
+    <!-- Button row 1 -->
+    <path
+        android:fillColor="#FF7043"
+        android:pathData="M28,52h10v10H28zM40,52h10v10H40zM52,52h10v10H52zM64,52h10v10H64z"/>
+
+    <!-- Button row 2 -->
+    <path
+        android:fillColor="#78909C"
+        android:pathData="M28,64h10v10H28zM40,64h10v10H40zM52,64h10v10H52z"/>
+
+    <!-- Button row 3 -->
+    <path
+        android:fillColor="#78909C"
+        android:pathData="M28,76h22v10H28zM52,76h10v10H52zM64,76h10v10H64z"/>
+
+</vector>

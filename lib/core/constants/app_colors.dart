@@ -1,37 +1,25 @@
 import 'package:flutter/material.dart';
 
 class AppColors {
-  // Core scaffold & surface
-  static const Color scaffold     = Color(0xFFF2F2F7); // light gray background
-  static const Color primary      = Color(0xFFFFFFFF); // white cards
+  static const Color scaffold     = Color(0xFFF5F5F7);
+  static const Color primary      = Color(0xFFFFFFFF);
   static const Color cardBg       = Color(0xFFFFFFFF);
   static const Color secondary    = Color(0xFFF5F5F5);
-
-  // Text
   static const Color textPrimary   = Color(0xFF1A1A1A);
   static const Color textSecondary = Color(0xFF6B6B6B);
-  static const Color divider       = Color(0xFFE0E0E0);
-
-  // Brand accent — purple (matches Saheli nav + icon containers)
+  static const Color divider       = Color(0xFFE8E8E8);
   static const Color accent        = Color(0xFF7C5FD6);
   static const Color accentLight   = Color(0xFFEDE8FB);
-
-  // SOS red
   static const Color sosRed        = Color(0xFFE53935);
   static const Color sosRedLight   = Color(0xFFFFEBEB);
-
-  // Status colors
   static const Color safeGreen     = Color(0xFF34C759);
-  static const Color warning       = Color(0xFFF5A623);  // orange for area score
+  static const Color warning       = Color(0xFFF5A623);
   static const Color warningLight  = Color(0xFFFFF3E0);
   static const Color error         = Color(0xFFE53935);
   static const Color success       = Color(0xFF43A047);
-
-  // Legacy aliases (keep old code compiling)
   static const Color iconColor     = Color(0xFF1A1A1A);
   static const Color cardBackground = Color(0xFFFFFFFF);
 
-  // ── Theme ────────────────────────────────────────────────────────────────
   static ThemeData get lightTheme {
     return ThemeData(
       useMaterial3: true,

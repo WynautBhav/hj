@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/services/contact_service.dart';
 
@@ -35,53 +36,19 @@ class _ContactsScreenState extends State<ContactsScreen> {
         child: _loading
             ? const Center(child: CircularProgressIndicator())
             : CustomScrollView(
+                physics: const BouncingScrollPhysics(),
                 slivers: [
                   SliverToBoxAdapter(
                     child: Padding(
-                      padding: const EdgeInsets.fromLTRB(24, 24, 24, 8),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Trusted Contacts',
-                                style: Theme.of(context).textTheme.headlineMedium,
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                '${_contacts.length}/5 contacts added',
-                                style: Theme.of(context).textTheme.bodyMedium,
-                              ),
-                            ],
-                          ),
-                          if (_contacts.length < 5)
-                            GestureDetector(
-                              onTap: () => _showAddContactDialog(),
-                              child: Container(
-                                width: 44,
-                                height: 44,
-                                decoration: BoxDecoration(
-                                  color: AppColors.accentLight,
-                                  shape: BoxShape.circle,
-                                ),
-                                child: const Icon(
-                                  Icons.person_add_rounded,
-                                  color: AppColors.accent,
-                                  size: 22,
-                                ),
-                              ),
-                            ),
-                        ],
-                      ),
+                      padding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
+                      child: _buildHeader(),
                     ),
                   ),
 
                   if (_contacts.isEmpty)
                     SliverToBoxAdapter(
                       child: Padding(
-                        padding: const EdgeInsets.all(24),
+                        padding: const EdgeInsets.all(20),
                         child: _EmptyContactsCard(
                           onAdd: _showAddContactDialog,
                         ),
@@ -97,6 +64,7 @@ class _ContactsScreenState extends State<ContactsScreen> {
                             child: _ContactCard(
                               contact: contact,
                               onDelete: () => _deleteContact(index),
+                              index: index,
                             ),
                           );
                         },
@@ -106,35 +74,89 @@ class _ContactsScreenState extends State<ContactsScreen> {
 
                   SliverToBoxAdapter(
                     child: Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-                      child: Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: AppColors.primary,
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: AppColors.divider),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'How it works',
-                              style: Theme.of(context).textTheme.titleMedium,
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              'When SOS is triggered, your trusted contacts receive an SMS with your live location link. They can track you on a browser map — no app install needed.',
-                              style: Theme.of(context).textTheme.bodyMedium,
-                            ),
-                          ],
-                        ),
-                      ),
+                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
+                      child: _buildHowItWorks(),
                     ),
                   ),
                 ],
               ),
       ),
     );
+  }
+
+  Widget _buildHeader() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Trusted Contacts',
+              style: Theme.of(context).textTheme.headlineMedium,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              '${_contacts.length}/5 contacts added',
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+          ],
+        ),
+        if (_contacts.length < 5)
+          _AddButton(onTap: _showAddContactDialog)
+        else
+          const SizedBox.shrink(),
+      ],
+    )
+    .animate()
+    .fadeIn(duration: 400.ms)
+    .slideX(begin: -0.1, end: 0);
+  }
+
+  Widget _buildHowItWorks() {
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: AppColors.primary,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: AppColors.divider),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF7C5FD6).withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(
+                  Icons.info_outline_rounded,
+                  color: Color(0xFF7C5FD6),
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Text(
+                'How it works',
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'When SOS is triggered, your trusted contacts receive an SMS with your live location link. They can track you on a browser map — no app install needed.',
+            style: Theme.of(context).textTheme.bodyMedium,
+          ),
+        ],
+      ),
+    )
+    .animate()
+    .fadeIn(delay: 300.ms, duration: 400.ms)
+    .slideY(begin: 0.1, end: 0);
   }
 
   void _deleteContact(int index) async {
@@ -183,18 +205,30 @@ class _ContactsScreenState extends State<ContactsScreen> {
               const SizedBox(height: 20),
               TextField(
                 controller: nameCtrl,
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   labelText: 'Contact Name',
                   hintText: 'e.g. Mom, Priya',
+                  filled: true,
+                  fillColor: AppColors.secondary,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
+                  ),
                 ),
               ),
               const SizedBox(height: 16),
               TextField(
                 controller: phoneCtrl,
                 keyboardType: TextInputType.phone,
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   labelText: 'Phone Number',
                   hintText: '+91 98765 43210',
+                  filled: true,
+                  fillColor: AppColors.secondary,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
+                  ),
                 ),
               ),
               const SizedBox(height: 16),
@@ -203,19 +237,24 @@ class _ContactsScreenState extends State<ContactsScreen> {
               const SizedBox(height: 8),
               Wrap(
                 spacing: 8,
+                runSpacing: 8,
                 children: relationships.map((r) {
                   final selected = r == selectedRelationship;
                   return GestureDetector(
                     onTap: () => setModalState(() => selectedRelationship = r),
-                    child: Chip(
-                      label: Text(r),
-                      backgroundColor: selected ? AppColors.accentLight : AppColors.secondary,
-                      labelStyle: TextStyle(
-                        color: selected ? AppColors.accent : AppColors.textSecondary,
-                        fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: selected ? const Color(0xFF7C5FD6) : AppColors.secondary,
+                        borderRadius: BorderRadius.circular(20),
                       ),
-                      side: BorderSide(
-                        color: selected ? AppColors.accent : Colors.transparent,
+                      child: Text(
+                        r,
+                        style: TextStyle(
+                          color: selected ? Colors.white : AppColors.textSecondary,
+                          fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
+                        ),
                       ),
                     ),
                   );
@@ -235,7 +274,7 @@ class _ContactsScreenState extends State<ContactsScreen> {
                     }
                   },
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.accent,
+                    backgroundColor: const Color(0xFF7C5FD6),
                     padding: const EdgeInsets.symmetric(vertical: 16),
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12)),
@@ -252,89 +291,169 @@ class _ContactsScreenState extends State<ContactsScreen> {
   }
 }
 
-class _ContactCard extends StatelessWidget {
-  final Contact contact;
-  final VoidCallback onDelete;
+class _AddButton extends StatelessWidget {
+  final VoidCallback onTap;
 
-  const _ContactCard({required this.contact, required this.onDelete});
+  const _AddButton({required this.onTap});
 
   @override
   Widget build(BuildContext context) {
-    final initial = contact.name[0].toUpperCase();
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.primary,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.divider),
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 48,
+        height: 48,
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xFF7C5FD6), Color(0xFF5B3CC4)],
+          ),
+          borderRadius: BorderRadius.circular(14),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF7C5FD6).withValues(alpha: 0.4),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: const Icon(
+          Icons.person_add_rounded,
+          color: Colors.white,
+          size: 22,
+        ),
       ),
-      child: Row(
-        children: [
-          CircleAvatar(
-            radius: 24,
-            backgroundColor: AppColors.accentLight,
-            child: Text(
-              initial,
-              style: const TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
-                color: AppColors.accent,
+    )
+    .animate()
+    .scale(begin: const Offset(0.8, 0.8), end: const Offset(1, 1), duration: 300.ms)
+    .fadeIn();
+  }
+}
+
+class _ContactCard extends StatelessWidget {
+  final Contact contact;
+  final VoidCallback onDelete;
+  final int index;
+
+  const _ContactCard({required this.contact, required this.onDelete, required this.index});
+
+  @override
+  Widget build(BuildContext context) {
+    final initial = contact.name.isNotEmpty ? contact.name[0].toUpperCase() : '?';
+    
+    return Dismissible(
+      key: Key(contact.phone),
+      direction: DismissDirection.endToStart,
+      onDismissed: (_) => onDelete(),
+      background: Container(
+        alignment: Alignment.centerRight,
+        padding: const EdgeInsets.only(right: 24),
+        decoration: BoxDecoration(
+          color: Colors.red,
+          borderRadius: BorderRadius.circular(18),
+        ),
+        child: const Icon(Icons.delete_rounded, color: Colors.white),
+      ),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: AppColors.primary,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: AppColors.divider),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.03),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 52,
+              height: 52,
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [Color(0xFF7C5FD6), Color(0xFF5B3CC4)],
+                ),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Center(
+                child: Text(
+                  initial,
+                  style: const TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                  ),
+                ),
               ),
             ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(contact.name,
-                    style: Theme.of(context).textTheme.titleMedium),
-                const SizedBox(height: 2),
-                Text(contact.phone,
-                    style: Theme.of(context).textTheme.bodyMedium),
-                const SizedBox(height: 6),
-                Row(
-                  children: [
-                    _Tag(label: 'Family', accent: false),
-                    const SizedBox(width: 6),
-                    _Tag(label: 'Call + SMS', accent: true),
-                  ],
-                ),
-              ],
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(contact.name,
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w600,
+                          )),
+                  const SizedBox(height: 2),
+                  Text(contact.phone,
+                      style: Theme.of(context).textTheme.bodyMedium),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      _Tag(label: 'SMS', isAccent: true),
+                      const SizedBox(width: 6),
+                      _Tag(label: 'Call', isAccent: false),
+                    ],
+                  ),
+                ],
+              ),
             ),
-          ),
-          GestureDetector(
-            onTap: onDelete,
-            child: const Padding(
-              padding: EdgeInsets.all(8),
-              child: Icon(Icons.chevron_right,
-                  color: AppColors.textSecondary, size: 20),
+            IconButton(
+              onPressed: onDelete,
+              icon: Icon(
+                Icons.delete_outline_rounded,
+                color: Colors.red.shade300,
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
-    );
+    )
+    .animate(delay: (index * 100).ms)
+    .fadeIn(duration: 400.ms)
+    .slideX(begin: 0.1, end: 0);
   }
 }
 
 class _Tag extends StatelessWidget {
   final String label;
-  final bool accent;
-  const _Tag({required this.label, required this.accent});
+  final bool isAccent;
+
+  const _Tag({required this.label, required this.isAccent});
 
   @override
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
-        color: accent ? AppColors.accentLight : AppColors.secondary,
+        color: isAccent
+            ? const Color(0xFF7C5FD6).withValues(alpha: 0.1)
+            : AppColors.secondary,
         borderRadius: BorderRadius.circular(50),
       ),
       child: Text(
         label,
         style: TextStyle(
           fontSize: 11,
-          color: accent ? AppColors.accent : AppColors.textSecondary,
+          color: isAccent ? const Color(0xFF7C5FD6) : AppColors.textSecondary,
           fontWeight: FontWeight.w500,
         ),
       ),
@@ -344,6 +463,7 @@ class _Tag extends StatelessWidget {
 
 class _EmptyContactsCard extends StatelessWidget {
   final VoidCallback onAdd;
+
   const _EmptyContactsCard({required this.onAdd});
 
   @override
@@ -352,22 +472,29 @@ class _EmptyContactsCard extends StatelessWidget {
       padding: const EdgeInsets.all(32),
       decoration: BoxDecoration(
         color: AppColors.primary,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(20),
         border: Border.all(color: AppColors.divider),
       ),
       child: Column(
         children: [
           Container(
-            width: 64,
-            height: 64,
-            decoration: const BoxDecoration(
-              color: AppColors.accentLight,
+            width: 80,
+            height: 80,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  const Color(0xFF7C5FD6).withValues(alpha: 0.1),
+                  const Color(0xFF7C5FD6).withValues(alpha: 0.05),
+                ],
+              ),
               shape: BoxShape.circle,
             ),
             child: const Icon(Icons.people_outline,
-                size: 32, color: AppColors.accent),
+                size: 40, color: Color(0xFF7C5FD6)),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 20),
           Text('No contacts yet',
               style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 8),
@@ -379,9 +506,19 @@ class _EmptyContactsCard extends StatelessWidget {
             onPressed: onAdd,
             icon: const Icon(Icons.add, size: 18),
             label: const Text('Add First Contact'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF7C5FD6),
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
           ),
         ],
       ),
-    );
+    )
+    .animate()
+    .fadeIn(duration: 400.ms)
+    .scale(begin: const Offset(0.95, 0.95), end: const Offset(1, 1));
   }
 }

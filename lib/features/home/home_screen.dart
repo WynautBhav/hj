@@ -1,59 +1,56 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/services/contact_service.dart';
 import '../sos/sos_screen.dart';
 import '../fake_call/fake_call_screen.dart';
 import '../contacts/contacts_screen.dart';
 import '../more/all_features_screen.dart';
-
-// ── Feature screen imports ───────────────────────────────────────────────────
 import '../evidence_locker/evidence_locker_screen.dart';
 import '../journey_mode/journey_mode_screen.dart';
 import '../legal_info/legal_info_screen.dart';
-import '../pdf_generator/pdf_generator_screen.dart';
-import '../guardian_mode/guardian_mode_screen.dart';
-import '../audio_recording/audio_recording_screen.dart';
-import '../safe_arrival/safe_arrival_screen.dart';
-import '../wrong_pin_capture/wrong_pin_capture_screen.dart';
-import '../safety_pulse/safety_pulse_screen.dart';
-import '../dead_man_switch/dead_man_switch_screen.dart';
-import '../scream_detection/scream_detection_screen.dart';
-import '../fake_battery/fake_battery_screen.dart';
-import '../flashlight_sos/flashlight_sos_screen.dart';
-import '../smart_contact_priority/smart_contact_priority_screen.dart';
-import '../personalized_sos_messages/personalized_sos_messages_screen.dart';
-import '../app_lock_data_wipe/app_lock_data_wipe_screen.dart';
-import '../sensitivity_settings/sensitivity_settings_screen.dart';
-import '../settings/settings_screen.dart';
-import '../battery_aware/battery_aware_screen.dart';
-import '../voice_read/voice_read_screen.dart';
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Root shell — owns the 5-tab BottomNavigationBar
-// ─────────────────────────────────────────────────────────────────────────────
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+  final String userName;
+  
+  const HomeScreen({super.key, required this.userName});
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   int _selectedIndex = 0;
+  late AnimationController _sosPulseController;
 
-  // Tabs: 0=Home, 1=FakeCall, (2=SOS FAB), 3=Contacts, 4=More
-  final List<Widget> _tabs = const [
-    HomeContent(),
-    FakeCallScreen(),
-    SizedBox.shrink(),     // placeholder — SOS is always the FAB
-    ContactsScreen(),
-    AllFeaturesScreen(),
-  ];
+  late final List<Widget> _tabs;
+
+  @override
+  void initState() {
+    super.initState();
+    _sosPulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2000),
+    )..repeat(reverse: true);
+    
+    _tabs = [
+      HomeContent(userName: widget.userName),
+      const FakeCallScreen(),
+      const SizedBox.shrink(),
+      const ContactsScreen(),
+      const AllFeaturesScreen(),
+    ];
+  }
+
+  @override
+  void dispose() {
+    _sosPulseController.dispose();
+    super.dispose();
+  }
 
   void _onTabTapped(int index) {
     if (index == 2) {
-      // SOS center button
       Navigator.push(context, MaterialPageRoute(builder: (_) => const SosScreen()));
       return;
     }
@@ -71,28 +68,37 @@ class _HomeScreenState extends State<HomeScreen> {
       bottomNavigationBar: _BottomNav(
         selectedIndex: _selectedIndex,
         onTap: _onTabTapped,
+        sosPulseController: _sosPulseController,
       ),
     );
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Bottom navigation bar — Saheli style with center SOS FAB
-// ─────────────────────────────────────────────────────────────────────────────
 class _BottomNav extends StatelessWidget {
   final int selectedIndex;
   final ValueChanged<int> onTap;
+  final AnimationController sosPulseController;
 
-  const _BottomNav({required this.selectedIndex, required this.onTap});
+  const _BottomNav({
+    required this.selectedIndex,
+    required this.onTap,
+    required this.sosPulseController,
+  });
 
   @override
   Widget build(BuildContext context) {
     final mq = MediaQuery.of(context);
     return Container(
-      height: 72 + mq.padding.bottom,
-      decoration: const BoxDecoration(
-        color: AppColors.primary,
-        border: Border(top: BorderSide(color: AppColors.divider, width: 1)),
+      height: 80 + mq.padding.bottom,
+      decoration: BoxDecoration(
+        color: const Color(0xFF1A1A2E),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.3),
+            blurRadius: 20,
+            offset: const Offset(0, -5),
+          ),
+        ],
       ),
       child: Padding(
         padding: EdgeInsets.only(bottom: mq.padding.bottom),
@@ -115,46 +121,10 @@ class _BottomNav extends StatelessWidget {
               selected: selectedIndex == 1,
               onTap: () => onTap(1),
             ),
-
-            // Center SOS FAB
-            GestureDetector(
+            _SosButton(
+              controller: sosPulseController,
               onTap: () => onTap(2),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Container(
-                    width: 60,
-                    height: 60,
-                    decoration: const BoxDecoration(
-                      color: AppColors.accent,
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: Color(0x337C5FD6),
-                          blurRadius: 12,
-                          spreadRadius: 2,
-                        ),
-                      ],
-                    ),
-                    child: const Icon(
-                      Icons.shield_rounded,
-                      color: AppColors.primary,
-                      size: 28,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  const Text(
-                    'SOS',
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.accent,
-                    ),
-                  ),
-                ],
-              ),
             ),
-
             _NavItem(
               icon: Icons.people_outline_rounded,
               activeIcon: Icons.people_rounded,
@@ -173,6 +143,58 @@ class _BottomNav extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _SosButton extends StatelessWidget {
+  final AnimationController controller;
+  final VoidCallback onTap;
+
+  const _SosButton({required this.controller, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedBuilder(
+        animation: controller,
+        builder: (context, child) {
+          final scale = 1.0 + (controller.value * 0.08);
+          final glowOpacity = 0.3 + (controller.value * 0.3);
+          
+          return Transform.scale(
+            scale: scale,
+            child: Container(
+              width: 64,
+              height: 64,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: const LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    Color(0xFFE53935),
+                    Color(0xFFB71C1C),
+                  ],
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFFE53935).withValues(alpha: glowOpacity),
+                    blurRadius: 20,
+                    spreadRadius: 2,
+                  ),
+                ],
+              ),
+              child: const Icon(
+                Icons.shield_rounded,
+                color: Colors.white,
+                size: 30,
+              ),
+            ),
+          );
+        },
       ),
     );
   }
@@ -201,22 +223,36 @@ class _NavItem extends StatelessWidget {
       onTap: onTap,
       behavior: HitTestBehavior.opaque,
       child: SizedBox(
-        width: 64,
+        width: 56,
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              selected ? activeIcon : icon,
-              size: 24,
-              color: selected ? AppColors.accent : AppColors.textSecondary,
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: selected 
+                    ? Colors.white.withValues(alpha: 0.15)
+                    : Colors.transparent,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(
+                selected ? activeIcon : icon,
+                size: 22,
+                color: selected 
+                    ? Colors.white 
+                    : Colors.white.withValues(alpha: 0.5),
+              ),
             ),
-            const SizedBox(height: 3),
+            const SizedBox(height: 4),
             Text(
               label,
               style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w500,
-                color: selected ? AppColors.accent : AppColors.textSecondary,
+                fontSize: 10,
+                fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
+                color: selected 
+                    ? Colors.white 
+                    : Colors.white.withValues(alpha: 0.5),
               ),
             ),
           ],
@@ -226,11 +262,10 @@ class _NavItem extends StatelessWidget {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Home tab content
-// ─────────────────────────────────────────────────────────────────────────────
 class HomeContent extends StatefulWidget {
-  const HomeContent({super.key});
+  final String userName;
+  
+  const HomeContent({super.key, required this.userName});
 
   @override
   State<HomeContent> createState() => _HomeContentState();
@@ -259,152 +294,139 @@ class _HomeContentState extends State<HomeContent> {
 
   @override
   Widget build(BuildContext context) {
+    final name = widget.userName.isNotEmpty ? widget.userName : 'there';
+    
     return SafeArea(
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(vertical: 8),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // ── Header ──────────────────────────────────────────────────
-            Padding(
-              padding: const EdgeInsets.fromLTRB(24, 16, 24, 0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    '${_greeting()}, Anjali',
-                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                          color: AppColors.textSecondary,
-                        ),
-                  ),
-                  const SizedBox(height: 4),
-                  RichText(
-                    text: const TextSpan(
-                      children: [
-                        TextSpan(
-                          text: 'Medusa',
-                          style: TextStyle(
-                            fontSize: 28,
-                            fontWeight: FontWeight.w800,
-                            color: AppColors.warning,
-                          ),
-                        ),
-                        TextSpan(
-                          text: ' — Your Shield',
-                          style: TextStyle(
-                            fontSize: 28,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.textPrimary,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Your phone. Your shield. Always.',
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          fontStyle: FontStyle.italic,
-                        ),
-                  ),
-                ],
-              ),
+      child: CustomScrollView(
+        physics: const BouncingScrollPhysics(),
+        slivers: [
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+            sliver: SliverList(
+              delegate: SliverChildListDelegate([
+                _buildHeader(name),
+                const SizedBox(height: 24),
+                _buildSafetyCard(),
+                const SizedBox(height: 20),
+                _buildQuickActions(),
+                const SizedBox(height: 24),
+                _buildProtectionCard(),
+                const SizedBox(height: 20),
+                _buildAlertCard(),
+                const SizedBox(height: 100),
+              ]),
             ),
-
-            const SizedBox(height: 20),
-
-            // ── Area Safety Score ────────────────────────────────────────
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: _AreaSafetyCard(),
-            ),
-
-            const SizedBox(height: 24),
-
-            // ── Quick Actions ────────────────────────────────────────────
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24),
-              child: Text(
-                'Quick Actions',
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
-            ),
-            const SizedBox(height: 12),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: _QuickActionsGrid(contacts: _contacts),
-            ),
-
-            const SizedBox(height: 24),
-
-            // ── Protection Lifecycle ─────────────────────────────────────
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: _ProtectionLifecycleCard(),
-            ),
-
-            const SizedBox(height: 16),
-
-            // ── Community Alert ──────────────────────────────────────────
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: _CommunityAlertCard(),
-            ),
-
-            const SizedBox(height: 24),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
-}
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Area Safety Score card with circular arc gauge
-// ─────────────────────────────────────────────────────────────────────────────
-class _AreaSafetyCard extends StatelessWidget {
-  _AreaSafetyCard();
+  Widget _buildHeader(String name) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          '$_greeting 👋',
+          style: TextStyle(
+            fontSize: 15,
+            color: AppColors.textSecondary,
+            fontWeight: FontWeight.w500,
+          ),
+        )
+        .animate()
+        .fadeIn(duration: 400.ms)
+        .slideX(begin: -0.1, end: 0, duration: 400.ms),
+        
+        const SizedBox(height: 4),
+        
+        Row(
+          children: [
+            const Text(
+              'Medusa',
+              style: TextStyle(
+                fontSize: 28,
+                fontWeight: FontWeight.w800,
+                color: Color(0xFF7C5FD6),
+              ),
+            ),
+            const SizedBox(width: 8),
+            const Text(
+              'Your Shield',
+              style: TextStyle(
+                fontSize: 28,
+                fontWeight: FontWeight.w700,
+                color: AppColors.textPrimary,
+              ),
+            ),
+          ],
+        )
+        .animate()
+        .fadeIn(delay: 100.ms, duration: 400.ms)
+        .slideX(begin: -0.1, end: 0, delay: 100.ms, duration: 400.ms),
+        
+        const SizedBox(height: 4),
+        
+        Text(
+          'Your phone. Your shield. Always.',
+          style: TextStyle(
+            fontSize: 14,
+            color: AppColors.textSecondary,
+            fontStyle: FontStyle.italic,
+          ),
+        )
+        .animate()
+        .fadeIn(delay: 200.ms, duration: 400.ms),
+      ],
+    );
+  }
 
-  // Mock score — hook up to real data later
-  final int score = 62;
-  final String summary =
-      'Moderate risk detected. Stay alert and keep location sharing on.';
-  final int incidents = 3;
-
-  @override
-  Widget build(BuildContext context) {
+  Widget _buildSafetyCard() {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: AppColors.primary,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppColors.divider),
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Color(0xFF1A1A2E),
+            Color(0xFF16213E),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF7C5FD6).withValues(alpha: 0.2),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
+          ),
+        ],
       ),
       child: Row(
         children: [
           SizedBox(
-            width: 90,
-            height: 90,
+            width: 80,
+            height: 80,
             child: CustomPaint(
-              painter: _ArcGaugePainter(score: score),
+              painter: _ArcGaugePainter(score: 78),
               child: Center(
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Text(
-                      '$score',
-                      style: const TextStyle(
-                        fontSize: 26,
+                    const Text(
+                      '78',
+                      style: TextStyle(
+                        fontSize: 24,
                         fontWeight: FontWeight.w800,
-                        color: AppColors.textPrimary,
+                        color: Colors.white,
                       ),
                     ),
-                    const Text(
+                    Text(
                       'SCORE',
                       style: TextStyle(
                         fontSize: 9,
                         fontWeight: FontWeight.w600,
-                        color: AppColors.textSecondary,
+                        color: Colors.white.withValues(alpha: 0.7),
                         letterSpacing: 1,
                       ),
                     ),
@@ -423,32 +445,44 @@ class _AreaSafetyCard extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.w700,
-                    color: AppColors.textPrimary,
+                    color: Colors.white,
                   ),
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  summary,
-                  style: Theme.of(context).textTheme.bodyMedium,
+                  'You\'re in a safe neighborhood. Keep your guards up!',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: Colors.white.withValues(alpha: 0.8),
+                  ),
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: 8),
                 Row(
                   children: [
                     Container(
-                      width: 8,
-                      height: 8,
-                      decoration: const BoxDecoration(
-                        color: AppColors.warning,
-                        shape: BoxShape.circle,
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.green.withValues(alpha: 0.2),
+                        borderRadius: BorderRadius.circular(8),
                       ),
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      '$incidents incidents nearby (24h)',
-                      style: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w500,
-                        color: AppColors.warning,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.check_circle_rounded,
+                            size: 12,
+                            color: Colors.green.shade300,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            'Low risk area',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w500,
+                              color: Colors.green.shade300,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
@@ -458,7 +492,223 @@ class _AreaSafetyCard extends StatelessWidget {
           ),
         ],
       ),
+    )
+    .animate()
+    .fadeIn(delay: 300.ms, duration: 500.ms)
+    .slideY(begin: 0.15, end: 0, delay: 300.ms, duration: 500.ms);
+  }
+
+  Widget _buildQuickActions() {
+    final actions = [
+      _QAItem(
+        icon: Icons.shield_rounded,
+        label: 'SOS Alert',
+        subtitle: 'Multi-trigger',
+        color: const Color(0xFFE53935),
+        bgColor: const Color(0xFFFFEBEE),
+        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SosScreen())),
+      ),
+      _QAItem(
+        icon: Icons.phone_rounded,
+        label: 'Fake Call',
+        subtitle: 'Escape danger',
+        color: const Color(0xFF43A047),
+        bgColor: const Color(0xFFE8F5E9),
+        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const FakeCallScreen())),
+      ),
+      _QAItem(
+        icon: Icons.directions_walk_rounded,
+        label: 'Journey Mode',
+        subtitle: 'Auto-alert',
+        color: const Color(0xFF1976D2),
+        bgColor: const Color(0xFFE3F2FD),
+        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const JourneyModeScreen())),
+      ),
+      _QAItem(
+        icon: Icons.lock_rounded,
+        label: 'Evidence',
+        subtitle: 'Secured',
+        color: const Color(0xFFF57C00),
+        bgColor: const Color(0xFFFFF3E0),
+        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const EvidenceLockerScreen())),
+      ),
+      _QAItem(
+        icon: Icons.balance_rounded,
+        label: 'Legal Info',
+        subtitle: 'Know rights',
+        color: const Color(0xFF7B1FA2),
+        bgColor: const Color(0xFFF3E5F5),
+        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const LegalInfoScreen())),
+      ),
+      _QAItem(
+        icon: Icons.apps_rounded,
+        label: 'More',
+        subtitle: 'All features',
+        color: const Color(0xFF455A64),
+        bgColor: const Color(0xFFECEFF1),
+        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AllFeaturesScreen())),
+      ),
+    ];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4),
+          child: Text(
+            'Quick Actions',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w700,
+              color: AppColors.textPrimary,
+            ),
+          ),
+        )
+        .animate()
+        .fadeIn(delay: 400.ms, duration: 400.ms),
+        
+        const SizedBox(height: 16),
+        
+        GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: actions.length,
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 3,
+            mainAxisSpacing: 12,
+            crossAxisSpacing: 12,
+            childAspectRatio: 0.95,
+          ),
+          itemBuilder: (context, i) => _QuickActionCard(
+            item: actions[i],
+            index: i,
+          ),
+        ),
+      ],
     );
+  }
+
+  Widget _buildProtectionCard() {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: AppColors.primary,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppColors.divider),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'PROTECTION LIFECYCLE',
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 1.4,
+              color: AppColors.textSecondary,
+            ),
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              _LifecyclePhase(
+                label: 'Before',
+                detail: 'Journey mode, alerts',
+                color: const Color(0xFF43A047),
+                index: 0,
+              ),
+              Container(
+                width: 1,
+                height: 40,
+                color: AppColors.divider,
+              ),
+              _LifecyclePhase(
+                label: 'During',
+                detail: 'SOS, evidence',
+                color: const Color(0xFFE53935),
+                index: 1,
+              ),
+              Container(
+                width: 1,
+                height: 40,
+                color: AppColors.divider,
+              ),
+              _LifecyclePhase(
+                label: 'After',
+                detail: 'Legal, FIR',
+                color: const Color(0xFF7C5FD6),
+                index: 2,
+              ),
+            ],
+          ),
+        ],
+      ),
+    )
+    .animate()
+    .fadeIn(delay: 500.ms, duration: 500.ms)
+    .slideY(begin: 0.15, end: 0, delay: 500.ms, duration: 500.ms);
+  }
+
+  Widget _buildAlertCard() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            const Color(0xFFFFF3E0),
+            const Color(0xFFFFE0B2).withValues(alpha: 0.5),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFFFB74D).withValues(alpha: 0.3)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: const Color(0xFFFFB74D).withValues(alpha: 0.2),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.tips_and_updates_rounded,
+              color: Color(0xFFF57C00),
+              size: 22,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Safety Tip',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF5D4037),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Keep your location sharing ON for instant emergency response.',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: const Color(0xFF5D4037).withValues(alpha: 0.8),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    )
+    .animate()
+    .fadeIn(delay: 600.ms, duration: 500.ms)
+    .slideY(begin: 0.15, end: 0, delay: 600.ms, duration: 500.ms);
   }
 }
 
@@ -475,16 +725,25 @@ class _ArcGaugePainter extends CustomPainter {
     const sweepFull = pi * 1.5;
 
     final bgPaint = Paint()
-      ..color = AppColors.divider
+      ..color = Colors.white.withValues(alpha: 0.1)
       ..style = PaintingStyle.stroke
       ..strokeCap = StrokeCap.round
-      ..strokeWidth = 8;
+      ..strokeWidth = 6;
+
+    Color scoreColor;
+    if (score >= 70) {
+      scoreColor = Colors.green;
+    } else if (score >= 40) {
+      scoreColor = Colors.orange;
+    } else {
+      scoreColor = Colors.red;
+    }
 
     final fgPaint = Paint()
-      ..color = AppColors.warning
+      ..color = scoreColor
       ..style = PaintingStyle.stroke
       ..strokeCap = StrokeCap.round
-      ..strokeWidth = 8;
+      ..strokeWidth = 6;
 
     canvas.drawArc(
       Rect.fromCircle(center: Offset(cx, cy), radius: radius),
@@ -506,84 +765,64 @@ class _ArcGaugePainter extends CustomPainter {
   bool shouldRepaint(covariant _ArcGaugePainter old) => old.score != score;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Quick Actions 3×2 grid
-// ─────────────────────────────────────────────────────────────────────────────
-class _QuickActionsGrid extends StatelessWidget {
-  final List<Contact> contacts;
-  const _QuickActionsGrid({required this.contacts});
+class _LifecyclePhase extends StatelessWidget {
+  final String label;
+  final String detail;
+  final Color color;
+  final int index;
+
+  const _LifecyclePhase({
+    required this.label,
+    required this.detail,
+    required this.color,
+    required this.index,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final actions = [
-      _QAItem(
-        icon: Icons.shield_rounded,
-        label: 'SOS Alert',
-        subtitle: 'Multi-trigger',
-        color: const Color(0xFF7C5FD6),
-        bgColor: const Color(0xFFEDE8FB),
-        onTap: () => Navigator.push(
-            context, MaterialPageRoute(builder: (_) => const SosScreen())),
+    return Expanded(
+      child: Column(
+        children: [
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.15),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              index == 0
+                  ? Icons.directions_walk_rounded
+                  : index == 1
+                      ? Icons.shield_rounded
+                      : Icons.gavel_rounded,
+              color: color,
+              size: 18,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              color: color,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            detail,
+            style: TextStyle(
+              fontSize: 10,
+              color: AppColors.textSecondary,
+            ),
+          ),
+        ],
       ),
-      _QAItem(
-        icon: Icons.phone_rounded,
-        label: 'Fake Call',
-        subtitle: 'Escape danger',
-        color: const Color(0xFF2ABD8B),
-        bgColor: const Color(0xFFE0F7F0),
-        onTap: () => Navigator.push(
-            context, MaterialPageRoute(builder: (_) => const FakeCallScreen())),
-      ),
-      _QAItem(
-        icon: Icons.directions_walk_rounded,
-        label: 'Journey Mode',
-        subtitle: 'Auto-alert',
-        color: const Color(0xFF5BA8F5),
-        bgColor: const Color(0xFFE3F0FD),
-        onTap: () => Navigator.push(context,
-            MaterialPageRoute(builder: (_) => const JourneyModeScreen())),
-      ),
-      _QAItem(
-        icon: Icons.lock_rounded,
-        label: 'Evidence Locker',
-        subtitle: 'Secured',
-        color: const Color(0xFFF5A623),
-        bgColor: const Color(0xFFFFF3E0),
-        onTap: () => Navigator.push(context,
-            MaterialPageRoute(builder: (_) => const EvidenceLockerScreen())),
-      ),
-      _QAItem(
-        icon: Icons.balance_rounded,
-        label: 'Legal Info',
-        subtitle: 'Know rights',
-        color: const Color(0xFF2ABD8B),
-        bgColor: const Color(0xFFE0F7F0),
-        onTap: () => Navigator.push(
-            context, MaterialPageRoute(builder: (_) => const LegalInfoScreen())),
-      ),
-      _QAItem(
-        icon: Icons.apps_rounded,
-        label: 'More',
-        subtitle: 'All features',
-        color: const Color(0xFF1A1A1A),
-        bgColor: const Color(0xFFEEEEEE),
-        onTap: () => Navigator.push(context,
-            MaterialPageRoute(builder: (_) => const AllFeaturesScreen())),
-      ),
-    ];
-
-    return GridView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      itemCount: actions.length,
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 3,
-        mainAxisSpacing: 12,
-        crossAxisSpacing: 12,
-        childAspectRatio: 0.92,
-      ),
-      itemBuilder: (context, i) => _QuickActionCard(item: actions[i]),
-    );
+    )
+    .animate(delay: (600 + (index * 100)).ms)
+    .fadeIn(duration: 400.ms)
+    .slideY(begin: 0.2, end: 0);
   }
 }
 
@@ -594,6 +833,7 @@ class _QAItem {
   final Color color;
   final Color bgColor;
   final VoidCallback onTap;
+
   const _QAItem({
     required this.icon,
     required this.label,
@@ -606,7 +846,9 @@ class _QAItem {
 
 class _QuickActionCard extends StatelessWidget {
   final _QAItem item;
-  const _QuickActionCard({required this.item});
+  final int index;
+
+  const _QuickActionCard({required this.item, required this.index});
 
   @override
   Widget build(BuildContext context) {
@@ -616,20 +858,27 @@ class _QuickActionCard extends StatelessWidget {
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
           color: AppColors.primary,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(18),
           border: Border.all(color: AppColors.divider),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.03),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Container(
-              width: 44,
-              height: 44,
+              width: 42,
+              height: 42,
               decoration: BoxDecoration(
                 color: item.bgColor,
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: Icon(item.icon, color: item.color, size: 22),
+              child: Icon(item.icon, color: item.color, size: 20),
             ),
             const Spacer(),
             Text(
@@ -651,152 +900,9 @@ class _QuickActionCard extends StatelessWidget {
           ],
         ),
       ),
-    );
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Protection Lifecycle card
-// ─────────────────────────────────────────────────────────────────────────────
-class _ProtectionLifecycleCard extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: AppColors.primary,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppColors.divider),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'COMPLETE PROTECTION LIFECYCLE',
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 1.4,
-              color: AppColors.textSecondary,
-            ),
-          ),
-          const SizedBox(height: 14),
-          IntrinsicHeight(
-            child: Row(
-              children: [
-                _LifecyclePhase(
-                  label: 'Before',
-                  detail: 'Journey mode, alerts',
-                  color: const Color(0xFF2ABD8B),
-                ),
-                const VerticalDivider(width: 1, color: AppColors.divider),
-                _LifecyclePhase(
-                  label: 'During',
-                  detail: 'SOS, evidence, morse',
-                  color: AppColors.accent,
-                ),
-                const VerticalDivider(width: 1, color: AppColors.divider),
-                _LifecyclePhase(
-                  label: 'After',
-                  detail: 'Legal, FIR, PDF',
-                  color: AppColors.textSecondary,
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _LifecyclePhase extends StatelessWidget {
-  final String label;
-  final String detail;
-  final Color color;
-  const _LifecyclePhase(
-      {required this.label, required this.detail, required this.color});
-
-  @override
-  Widget build(BuildContext context) {
-    return Expanded(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.w700,
-                color: color,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              detail,
-              style: const TextStyle(
-                fontSize: 12,
-                color: AppColors.textSecondary,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Community Alert card
-// ─────────────────────────────────────────────────────────────────────────────
-class _CommunityAlertCard extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.primary,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppColors.divider),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 40,
-            height: 40,
-            decoration: const BoxDecoration(
-              color: AppColors.warningLight,
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(Icons.location_on_rounded,
-                color: AppColors.warning, size: 22),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Community Alert',
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.textPrimary,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'Poorly lit stretch near MG Road crossing reported 15 min ago. Be careful after 9pm.',
-                  style: Theme.of(context).textTheme.bodyMedium,
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
+    )
+    .animate(delay: (400 + (index * 50)).ms)
+    .fadeIn(duration: 400.ms)
+    .scale(begin: const Offset(0.9, 0.9), end: const Offset(1, 1));
   }
 }
