@@ -1,4 +1,5 @@
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter/services.dart';
 import 'location_service.dart';
 
 class Contact {
@@ -90,10 +91,17 @@ class SmsService {
   }
 
   Future<void> _sendSms(String phone, String message) async {
-    // Note: Actual SMS sending requires platform-specific implementation
-    // For demo purposes, we'll log the message
-    // In production, use flutter_telephony or similar package
-    print('SMS to $phone: $message');
+    const shieldChannel = MethodChannel('com.saheli.saheli/shield');
+    try {
+      await shieldChannel.invokeMethod('sendSms', {
+        'phone': phone,
+        'message': message,
+      });
+      print('Native SMS sent to $phone: $message');
+    } catch (e) {
+      print('Failed to send native SMS to $phone: $e');
+      // Fallback or log error
+    }
   }
 
   Future<void> sendLocationSms(List<Contact> contacts, String name) async {

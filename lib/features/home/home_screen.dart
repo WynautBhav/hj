@@ -10,6 +10,7 @@ import '../more/all_features_screen.dart';
 import '../evidence_locker/evidence_locker_screen.dart';
 import '../journey_mode/journey_mode_screen.dart';
 import '../legal_info/legal_info_screen.dart';
+import '../area_safety/ui/area_safety_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   final String userName;
@@ -284,7 +285,7 @@ class _HomeContentState extends State<HomeContent> with SingleTickerProviderStat
       duration: const Duration(milliseconds: 1500),
     );
     
-    _gaugeAnimation = Tween<double>(begin: 0, end: 0.78).animate(
+    _gaugeAnimation = Tween<double>(begin: 0, end: 0.62).animate(
       CurvedAnimation(parent: _gaugeController, curve: Curves.easeOutCubic),
     );
     
@@ -401,120 +402,126 @@ class _HomeContentState extends State<HomeContent> with SingleTickerProviderStat
   }
 
   Widget _buildSafetyCard() {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            AppColors.accent,
-            AppColors.accentDark,
+    return GestureDetector(
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const AreaSafetyScreen()),
+      ),
+      child: Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              AppColors.accent,
+              AppColors.accentDark,
+            ],
+          ),
+          borderRadius: BorderRadius.circular(24),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.accent.withValues(alpha: 0.3),
+              blurRadius: 20,
+              offset: const Offset(0, 8),
+            ),
           ],
         ),
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.accent.withValues(alpha: 0.3),
-            blurRadius: 20,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          AnimatedBuilder(
-            animation: _gaugeAnimation,
-            builder: (context, child) {
-              return SizedBox(
-                width: 80,
-                height: 80,
-                child: CustomPaint(
-                  painter: _ArcGaugePainter(score: (_gaugeAnimation.value * 100).round()),
-                  child: Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          '${(_gaugeAnimation.value * 100).round()}',
-                          style: const TextStyle(
-                            fontSize: 24,
-                            fontWeight: FontWeight.w800,
-                            color: Colors.white,
-                          ),
-                        ),
-                        Text(
-                          'SCORE',
-                          style: TextStyle(
-                            fontSize: 9,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.white.withValues(alpha: 0.7),
-                            letterSpacing: 1,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              );
-            },
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Area Safety',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.white,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  'You\'re in a safe neighborhood. Keep your guards up!',
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: Colors.white.withValues(alpha: 0.9),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.2),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
+        child: Row(
+          children: [
+            AnimatedBuilder(
+              animation: _gaugeAnimation,
+              builder: (context, child) {
+                return SizedBox(
+                  width: 80,
+                  height: 80,
+                  child: CustomPaint(
+                    painter: _ArcGaugePainter(score: (_gaugeAnimation.value * 100).round()),
+                    child: Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          const Icon(
-                            Icons.check_circle_rounded,
-                            size: 12,
-                            color: Colors.white,
-                          ),
-                          const SizedBox(width: 4),
-                          const Text(
-                            'Low risk area',
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w500,
+                          Text(
+                            '${(_gaugeAnimation.value * 100).round()}',
+                            style: const TextStyle(
+                              fontSize: 24,
+                              fontWeight: FontWeight.w800,
                               color: Colors.white,
+                            ),
+                          ),
+                          Text(
+                            'SCORE',
+                            style: TextStyle(
+                              fontSize: 9,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.white.withValues(alpha: 0.7),
+                              letterSpacing: 1,
                             ),
                           ),
                         ],
                       ),
                     ),
-                  ],
-                ),
-              ],
+                  ),
+                );
+              },
             ),
-          ),
-        ],
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Area Safety',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'You\'re in a safe neighborhood. Keep your guards up!',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: Colors.white.withValues(alpha: 0.9),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.2),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.check_circle_rounded,
+                              size: 12,
+                              color: Colors.white,
+                            ),
+                            SizedBox(width: 4),
+                            Text(
+                              'Low risk area',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w500,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     )
     .animate()

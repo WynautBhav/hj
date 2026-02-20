@@ -1,7 +1,10 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class PermissionRequestScreen extends StatefulWidget {
   final VoidCallback onComplete;
@@ -14,6 +17,7 @@ class PermissionRequestScreen extends StatefulWidget {
 
 class _PermissionRequestScreenState extends State<PermissionRequestScreen> {
   bool _isRequesting = false;
+  final Map<String, bool> _permissionStatus = {};
   final List<_PermissionItem> _permissions = [
     _PermissionItem(
       icon: Icons.location_on_rounded,
@@ -28,6 +32,8 @@ class _PermissionRequestScreenState extends State<PermissionRequestScreen> {
       description: 'Send emergency alerts to contacts',
       permission: Permission.sms,
       color: Colors.blue,
+      requiresSpecialHandling: true,
+      specialMessage: 'On Android 4.4+, you must set this app as your default SMS app to send messages. Go to Settings > Apps > Default apps > SMS.',
     ),
     _PermissionItem(
       icon: Icons.camera_alt_rounded,
@@ -51,11 +57,13 @@ class _PermissionRequestScreenState extends State<PermissionRequestScreen> {
       color: Colors.purple,
     ),
     _PermissionItem(
-      icon: Icons.battery_charging_full_rounded,
-      title: 'Battery',
-      description: 'Run in background for 24/7 protection',
-      permission: Permission.ignoreBatteryOptimizations,
-      color: Colors.teal,
+      icon: Icons.layers_rounded,
+      title: 'Display Over Apps',
+      description: 'Required for Fake Call & Background SOS',
+      permission: Permission.systemAlertWindow,
+      color: Colors.indigo,
+      requiresSpecialHandling: true,
+      specialMessage: 'Display over other apps requires special permission. After tapping Grant, you\'ll be redirected to settings.',
     ),
   ];
 
@@ -68,7 +76,7 @@ class _PermissionRequestScreenState extends State<PermissionRequestScreen> {
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: [
-              const Color(0xFF7C5FD6),
+              const Color(0xFF9172DB), // AppColors.accent
               Colors.white,
             ],
             stops: const [0.0, 0.5],
@@ -117,7 +125,7 @@ class _PermissionRequestScreenState extends State<PermissionRequestScreen> {
           child: const Icon(
             Icons.security_rounded,
             size: 40,
-            color: Color(0xFF7C5FD6),
+            color: Color(0xFF9172DB),
           ),
         ),
         const SizedBox(height: 24),
@@ -142,6 +150,7 @@ class _PermissionRequestScreenState extends State<PermissionRequestScreen> {
   }
 
   Widget _buildPermissionTile(_PermissionItem item) {
+    final isGranted = _permissionStatus[item.title] ?? false;
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Container(
@@ -163,12 +172,14 @@ class _PermissionRequestScreenState extends State<PermissionRequestScreen> {
               width: 48,
               height: 48,
               decoration: BoxDecoration(
-                color: item.color.withValues(alpha: 0.1),
+                color: isGranted 
+                    ? Colors.green.withValues(alpha: 0.1)
+                    : item.color.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Icon(
-                item.icon,
-                color: item.color,
+                isGranted ? Icons.check_circle : item.icon,
+                color: isGranted ? Colors.green : item.color,
                 size: 24,
               ),
             ),
@@ -197,8 +208,8 @@ class _PermissionRequestScreenState extends State<PermissionRequestScreen> {
               ),
             ),
             Icon(
-              Icons.check_circle_rounded,
-              color: const Color(0xFF7C5FD6),
+              isGranted ? Icons.check_circle_rounded : Icons.radio_button_unchecked_rounded,
+              color: isGranted ? Colors.green : Colors.grey,
               size: 24,
             ),
           ],
@@ -229,7 +240,7 @@ class _PermissionRequestScreenState extends State<PermissionRequestScreen> {
             child: ElevatedButton(
               onPressed: _isRequesting ? null : _requestPermissions,
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF7C5FD6),
+                backgroundColor: const Color(0xFF9172DB),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(16),
                 ),
@@ -261,7 +272,7 @@ class _PermissionRequestScreenState extends State<PermissionRequestScreen> {
             child: const Text(
               'Open Settings',
               style: TextStyle(
-                color: Color(0xFF7C5FD6),
+                color: Color(0xFF9172DB),
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -276,16 +287,107 @@ class _PermissionRequestScreenState extends State<PermissionRequestScreen> {
     
     for (final item in _permissions) {
       try {
-        await item.permission.request();
+        PermissionStatus status;
+        
+        if (item.requiresSpecialHandling) {
+          if (item.permission == Permission.systemAlertWindow) {
+            status = await Permission.systemAlertWindow.request();
+            if (status.isDenied && mounted) {
+              _showSystemAlertWindowInstructions();
+            }
+          } else {
+            status = await item.permission.request();
+            if (status.isDenied && item.specialMessage != null && mounted) {
+              _showSpecialPermissionDialog(item.title, item.specialMessage!);
+            }
+          }
+        } else {
+          status = await item.permission.request();
+        }
+        
+        setState(() {
+          _permissionStatus[item.title] = status.isGranted;
+        });
       } catch (e) {
-        // Continue even if one fails
+        debugPrint('Permission request error for ${item.title}: $e');
+        setState(() {
+          _permissionStatus[item.title] = false;
+        });
       }
     }
     
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('permissions_asked', true);
     
-    widget.onComplete();
+    if (mounted) {
+      widget.onComplete();
+    }
+  }
+
+  void _showSystemAlertWindowInstructions() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Display Over Apps Permission'),
+        content: const Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('To enable "Display Over Other Apps":'),
+            SizedBox(height: 12),
+            Text('1. Tap "Open Settings" below'),
+            Text('2. Find this app in the list'),
+            Text('3. Enable "Display over other apps"'),
+            Text('4. Return to the app'),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Later'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _openSystemAlertWindowSettings();
+            },
+            child: const Text('Open Settings'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _openSystemAlertWindowSettings() async {
+    if (Platform.isAndroid) {
+      try {
+        final Uri uri = Uri.parse('android.settings.APPLICATION_DETAILS_SETTINGS&package=com.calculator.app');
+        if (await canLaunchUrl(uri)) {
+          await launchUrl(uri);
+        } else {
+          await openAppSettings();
+        }
+      } catch (e) {
+        debugPrint('Failed to open overlay settings: $e');
+        await openAppSettings();
+      }
+    }
+  }
+
+  void _showSpecialPermissionDialog(String title, String message) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('$title Permission'),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
   }
 }
 
@@ -295,6 +397,8 @@ class _PermissionItem {
   final String description;
   final Permission permission;
   final Color color;
+  final bool requiresSpecialHandling;
+  final String? specialMessage;
 
   _PermissionItem({
     required this.icon,
@@ -302,5 +406,7 @@ class _PermissionItem {
     required this.description,
     required this.permission,
     required this.color,
+    this.requiresSpecialHandling = false,
+    this.specialMessage,
   });
 }

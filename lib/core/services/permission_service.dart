@@ -1,4 +1,5 @@
-import 'package:permission_handler/permission_handler.dart';
+import 'package:flutter/material.dart';
+import 'package:permission_handler/permission_handler.dart' as ph;
 import 'package:shared_preferences/shared_preferences.dart';
 
 class PermissionService {
@@ -14,31 +15,31 @@ class PermissionService {
     await prefs.setBool(_permissionsAskedKey, true);
   }
 
-  static Future<Map<Permission, PermissionStatus>> requestAllPermissions() async {
+  static Future<Map<ph.Permission, ph.PermissionStatus>> requestAllPermissions() async {
     final permissions = {
-      Permission.locationWhenInUse,
-      Permission.locationAlways,
-      Permission.sms,
-      Permission.camera,
-      Permission.microphone,
-      Permission.storage,
-      Permission.phone,
-      Permission.bluetooth,
-      Permission.bluetoothConnect,
-      Permission.bluetoothScan,
-      Permission.notification,
-      Permission.ignoreBatteryOptimizations,
-      Permission.accessNotificationPolicy,
+      ph.Permission.locationWhenInUse,
+      ph.Permission.locationAlways,
+      ph.Permission.sms,
+      ph.Permission.camera,
+      ph.Permission.microphone,
+      ph.Permission.storage,
+      ph.Permission.phone,
+      ph.Permission.bluetooth,
+      ph.Permission.bluetoothConnect,
+      ph.Permission.bluetoothScan,
+      ph.Permission.notification,
+      ph.Permission.ignoreBatteryOptimizations,
+      ph.Permission.accessNotificationPolicy,
     };
 
-    final results = <Permission, PermissionStatus>{};
+    final results = <ph.Permission, ph.PermissionStatus>{};
 
     for (final permission in permissions) {
       try {
         final status = await permission.request();
         results[permission] = status;
       } catch (e) {
-        results[permission] = PermissionStatus.permanentlyDenied;
+        results[permission] = ph.PermissionStatus.permanentlyDenied;
       }
     }
 
@@ -46,46 +47,54 @@ class PermissionService {
   }
 
   static Future<bool> checkAndRequestLocation() async {
-    var status = await Permission.locationWhenInUse.status;
+    var status = await ph.Permission.locationWhenInUse.status;
     if (status.isDenied) {
-      status = await Permission.locationWhenInUse.request();
+      status = await ph.Permission.locationWhenInUse.request();
     }
     return status.isGranted;
   }
 
   static Future<bool> checkAndRequestCamera() async {
-    var status = await Permission.camera.status;
+    var status = await ph.Permission.camera.status;
     if (status.isDenied) {
-      status = await Permission.camera.request();
+      status = await ph.Permission.camera.request();
     }
     return status.isGranted;
   }
 
   static Future<bool> checkAndRequestMicrophone() async {
-    var status = await Permission.microphone.status;
+    var status = await ph.Permission.microphone.status;
     if (status.isDenied) {
-      status = await Permission.microphone.request();
+      status = await ph.Permission.microphone.request();
     }
     return status.isGranted;
   }
 
   static Future<bool> checkAndRequestSms() async {
-    var status = await Permission.sms.status;
+    var status = await ph.Permission.sms.status;
     if (status.isDenied) {
-      status = await Permission.sms.request();
+      status = await ph.Permission.sms.request();
     }
     return status.isGranted;
   }
 
   static Future<bool> checkAndRequestNotification() async {
-    var status = await Permission.notification.status;
+    var status = await ph.Permission.notification.status;
     if (status.isDenied) {
-      status = await Permission.notification.request();
+      status = await ph.Permission.notification.request();
+    }
+    return status.isGranted;
+  }
+
+  static Future<bool> checkAndRequestSystemAlertWindow() async {
+    var status = await ph.Permission.systemAlertWindow.status;
+    if (status.isDenied) {
+      status = await ph.Permission.systemAlertWindow.request();
     }
     return status.isGranted;
   }
 
   static Future<void> openAppSettings() async {
-    await openAppSettings();
+    await ph.openAppSettings();
   }
 }

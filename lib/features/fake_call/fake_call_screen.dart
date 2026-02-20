@@ -49,7 +49,8 @@ class _FakeCallScreenState extends State<FakeCallScreen>
     setState(() => _callerName = name);
   }
 
-  void _startFakeCall() {
+  void _startFakeCall() async {
+    final prefs = await SharedPreferences.getInstance();
     if (_delaySeconds == 0) {
       _triggerRinging();
     } else {
@@ -61,7 +62,14 @@ class _FakeCallScreenState extends State<FakeCallScreen>
           duration: const Duration(seconds: 2),
         ),
       );
-      _delayTimer = Timer(Duration(seconds: _delaySeconds), _triggerRinging);
+      
+      // We set a timer. When it fires, we write to SharedPreferences 
+      // which the background isolate monitors every second.
+      // This allows the Fake Call to trigger a screen-wake even if the app was closed.
+      _delayTimer = Timer(Duration(seconds: _delaySeconds), () async {
+        await prefs.setBool('trigger_fake_call_now', true);
+        _triggerRinging(); 
+      });
     }
   }
 

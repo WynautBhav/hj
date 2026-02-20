@@ -95,8 +95,10 @@ class ScreamDetectionService {
     
     onCountdownStart?.call();
     
-    _cancelTimer = Timer(const Duration(seconds: 3), () {
+    _cancelTimer = Timer(const Duration(seconds: 3), () async {
       if (_isCountingDown) {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setBool('trigger_sos_now', true);
         onScreamDetected?.call();
       }
       _isCountingDown = false;

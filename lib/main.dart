@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -10,9 +11,12 @@ import 'features/home/home_screen.dart';
 import 'features/sos/sos_screen.dart';
 import 'features/onboarding/onboarding_screen.dart';
 import 'features/permission/permission_request_screen.dart';
+import 'features/fake_call/fake_call_screen.dart';
+import 'core/services/background_service.dart';
 
-void main() {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await initializeBackgroundService();
   
   SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
@@ -41,6 +45,7 @@ class _MedusaAppState extends State<MedusaApp> with WidgetsBindingObserver {
   String _userName = '';
   late ShakeService _shakeService;
   late PowerButtonService _powerButtonService;
+  Timer? _bgCheckTimer;
 
   @override
   void initState() {
@@ -48,11 +53,27 @@ class _MedusaAppState extends State<MedusaApp> with WidgetsBindingObserver {
     WidgetsBinding.instance.addObserver(this);
     _initServices();
     _checkOnboarding();
+    _startBackgroundListener();
+  }
+
+  void _startBackgroundListener() {
+    _bgCheckTimer = Timer.periodic(const Duration(seconds: 1), (timer) async {
+      final prefs = await SharedPreferences.getInstance();
+      if (prefs.getBool('trigger_sos_now') == true) {
+        await prefs.setBool('trigger_sos_now', false);
+        _triggerSos();
+      }
+      if (prefs.getBool('trigger_fake_call_now') == true) {
+        await prefs.setBool('trigger_fake_call_now', false);
+        _triggerFakeCall();
+      }
+    });
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _bgCheckTimer?.cancel();
     _shakeService.dispose();
     _powerButtonService.dispose();
     super.dispose();
@@ -111,6 +132,15 @@ class _MedusaAppState extends State<MedusaApp> with WidgetsBindingObserver {
           },
           transitionDuration: const Duration(milliseconds: 300),
         ),
+      );
+    }
+  }
+
+  void _triggerFakeCall() {
+    if (mounted) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const FakeCallScreen()),
       );
     }
   }

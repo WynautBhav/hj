@@ -47,8 +47,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: [
-              const Color(0xFF7C5FD6),
-              const Color(0xFF9B7BF5).withValues(alpha: 0.8),
+              AppColors.accent,
+              AppColors.accentLight,
               Colors.white,
             ],
             stops: const [0.0, 0.4, 1.0],
@@ -93,7 +93,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         color: Colors.white,
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF7C5FD6).withValues(alpha: 0.3),
+            color: AppColors.accent.withValues(alpha: 0.3),
             blurRadius: 30,
             spreadRadius: 5,
           ),
@@ -102,7 +102,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       child: const Icon(
         Icons.shield_rounded,
         size: 60,
-        color: Color(0xFF7C5FD6),
+        color: AppColors.accent,
       ),
     )
     .animate()
@@ -185,17 +185,17 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               controller: _nameController,
               style: const TextStyle(
                 fontSize: 18,
-                color: Color(0xFF1A1A2E),
+                color: AppColors.textPrimary,
                 fontWeight: FontWeight.w500,
               ),
               decoration: InputDecoration(
                 hintText: 'Enter your name',
                 hintStyle: TextStyle(
-                  color: const Color(0xFF1A1A2E).withValues(alpha: 0.4),
+                  color: AppColors.textPrimary.withValues(alpha: 0.4),
                 ),
                 prefixIcon: Icon(
                   Icons.person_outline_rounded,
-                  color: const Color(0xFF7C5FD6).withValues(alpha: 0.7),
+                  color: AppColors.accent,
                 ),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(16),
@@ -208,7 +208,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(16),
                   borderSide: const BorderSide(
-                    color: Color(0xFF7C5FD6),
+                    color: AppColors.accent,
                     width: 2,
                   ),
                 ),
@@ -247,13 +247,13 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       child: ElevatedButton(
         onPressed: _isLoading ? null : _saveName,
         style: ElevatedButton.styleFrom(
-          backgroundColor: const Color(0xFF7C5FD6),
+          backgroundColor: AppColors.accent,
           foregroundColor: Colors.white,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
           ),
           elevation: 4,
-          shadowColor: const Color(0xFF7C5FD6).withValues(alpha: 0.4),
+          shadowColor: AppColors.accent.withValues(alpha: 0.4),
         ),
         child: _isLoading
             ? const SizedBox(

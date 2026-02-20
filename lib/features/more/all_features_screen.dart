@@ -22,6 +22,7 @@ import '../flashlight_sos/flashlight_sos_screen.dart';
 import '../battery_aware/battery_aware_screen.dart';
 import '../safe_arrival/safe_arrival_screen.dart';
 import '../sos/sos_screen.dart';
+import '../voice_sos/ui/voice_sos_screen.dart';
 
 class _FeatureEntry {
   final String title;
@@ -84,6 +85,12 @@ class AllFeaturesScreen extends StatelessWidget {
       subtitle: 'Flash SOS in Morse code using torch',
       icon: Icons.flashlight_on_rounded,
       screen: FlashlightSosScreen(),
+    ),
+    _FeatureEntry(
+      title: 'Voice-Armed SOS',
+      subtitle: 'Trigger SOS by speaking your phrase',
+      icon: Icons.mic_rounded,
+      screen: VoiceSOSScreen(),
     ),
   ];
 

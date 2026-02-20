@@ -2,9 +2,12 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/services/contact_service.dart';
 import '../../core/services/location_service.dart';
+import '../../core/services/flashlight_service.dart';
+import '../../core/services/audio_recording_service.dart';
 
 class SosScreen extends StatefulWidget {
   const SosScreen({super.key});
@@ -93,9 +96,19 @@ class _SosScreenState extends State<SosScreen> with SingleTickerProviderStateMix
         context: context,
         barrierDismissible: false,
         builder: (context) => _SosSentDialog(
-          onOk: () {
-            Navigator.pop(context);
-            Navigator.pop(context);
+          onOk: () async {
+            // STOP background actions
+            final prefs = await SharedPreferences.getInstance();
+            await prefs.setBool('bg_sos_actions_active', false);
+            await prefs.setBool('trigger_sos_now', false);
+            
+            FlashlightService().stopSos();
+            AudioRecordingService().stopRecording();
+
+            if (context.mounted) {
+              Navigator.pop(context);
+              Navigator.pop(context);
+            }
           },
         ),
       );

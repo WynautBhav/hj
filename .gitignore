@@ -43,4 +43,11 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Binaries
+*.apk
+
+# Android build artifacts
+/android/build/
+
 flutter_sdk.tar.xz

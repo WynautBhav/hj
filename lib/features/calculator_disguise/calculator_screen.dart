@@ -5,6 +5,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../../core/constants/app_colors.dart';
+import '../../core/services/wrong_pin_capture_service.dart';
 
 class CalculatorDisguiseScreen extends StatefulWidget {
   final VoidCallback onUnlocked;
@@ -22,6 +23,7 @@ class _CalculatorDisguiseScreenState extends State<CalculatorDisguiseScreen> wit
   static const String _pinKey = 'unlock_pin';
   static const String _wrongAttemptsKey = 'wrong_attempts';
   final FlutterSecureStorage _secureStorage = const FlutterSecureStorage();
+  final WrongPinCaptureService _captureService = WrongPinCaptureService();
   
   late AnimationController _shakeController;
   late Animation<double> _shakeAnimation;
@@ -43,6 +45,7 @@ class _CalculatorDisguiseScreenState extends State<CalculatorDisguiseScreen> wit
   @override
   void dispose() {
     _shakeController.dispose();
+    _captureService.dispose();
     super.dispose();
   }
 
@@ -76,6 +79,7 @@ class _CalculatorDisguiseScreenState extends State<CalculatorDisguiseScreen> wit
       HapticFeedback.heavyImpact();
       widget.onUnlocked();
     } else {
+      await _captureService.capturePhoto();
       await _incrementWrongAttempts();
       _shakeController.forward().then((_) => _shakeController.reset());
       if (mounted) {
@@ -114,7 +118,7 @@ class _CalculatorDisguiseScreenState extends State<CalculatorDisguiseScreen> wit
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF1A1A2E),
+      backgroundColor: Colors.white,
       body: SafeArea(
         child: Column(
           children: [
@@ -139,7 +143,7 @@ class _CalculatorDisguiseScreenState extends State<CalculatorDisguiseScreen> wit
                     style: const TextStyle(
                       fontSize: 72,
                       fontWeight: FontWeight.w300,
-                      color: Colors.white,
+                      color: AppColors.textPrimary,
                       letterSpacing: -2,
                     ),
                   ),
@@ -241,7 +245,7 @@ class _AnimatedButtonState extends State<_AnimatedButton> {
                     : const LinearGradient(
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
-                        colors: [Color(0xFF2A2A4C), Color(0xFF1A1A2E)],
+                        colors: [Color(0xFFF5F5FA), Color(0xFFEEEEF5)],
                       ),
             boxShadow: isOperator
                 ? [
@@ -261,7 +265,7 @@ class _AnimatedButtonState extends State<_AnimatedButton> {
               fontWeight: FontWeight.w400,
               color: isOperator || isFunction 
                   ? Colors.white 
-                  : Colors.white.withValues(alpha: 0.9),
+                  : AppColors.textPrimary,
             ),
           ),
         ),

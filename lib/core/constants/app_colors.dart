@@ -10,9 +10,9 @@ class AppColors {
   static const Color textPrimary   = Color(0xFF1A1A2E);
   static const Color textSecondary = Color(0xFF6B6B7B);
   static const Color divider       = Color(0xFFE8E0F0);
-  static const Color accent        = Color(0xFF7C5FD6);
-  static const Color accentLight   = Color(0xFFEDE8FB);
-  static const Color accentDark    = Color(0xFF5B3CC4);
+  static const Color accent        = Color(0xFF9172DB); // Premium Lavender
+  static const Color accentLight   = Color(0xFFF3EFFF);
+  static const Color accentDark    = Color(0xFF6B4CAB);
   static const Color sosRed        = Color(0xFFE53935);
   static const Color sosRedLight   = Color(0xFFFFEBEB);
   static const Color safeGreen     = Color(0xFF34C759);
