@@ -1,4 +1,3 @@
-import 'dart:math' show sin, cos;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -10,6 +9,7 @@ import 'features/calculator_disguise/calculator_screen.dart';
 import 'features/home/home_screen.dart';
 import 'features/sos/sos_screen.dart';
 import 'features/onboarding/onboarding_screen.dart';
+import 'features/permission/permission_request_screen.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -34,10 +34,10 @@ class MedusaApp extends StatefulWidget {
   State<MedusaApp> createState() => _MedusaAppState();
 }
 
-class _MedusaAppState extends State<MedusaApp> {
+class _MedusaAppState extends State<MedusaApp> with WidgetsBindingObserver {
   bool _isUnlocked = false;
   bool _showOnboarding = false;
-  bool _permissionsShown = false;
+  bool _showPermissions = false;
   String _userName = '';
   late ShakeService _shakeService;
   late PowerButtonService _powerButtonService;
@@ -45,25 +45,24 @@ class _MedusaAppState extends State<MedusaApp> {
   @override
   void initState() {
     super.initState();
-    _setHighRefreshRate();
+    WidgetsBinding.instance.addObserver(this);
     _initServices();
     _checkOnboarding();
   }
 
-  void _setHighRefreshRate() {
-    // High refresh rate is automatically handled by Flutter on modern devices
-    // The system will use the device's native refresh rate (60/90/120Hz)
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _shakeService.dispose();
+    _powerButtonService.dispose();
+    super.dispose();
   }
 
-  Future<void> _checkOnboarding() async {
-    final prefs = await SharedPreferences.getInstance();
-    final onboardingComplete = prefs.getBool('onboarding_complete') ?? false;
-    final name = prefs.getString('user_name') ?? '';
-    
-    setState(() {
-      _showOnboarding = !onboardingComplete;
-      _userName = name;
-    });
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _initBackgroundServices();
+    }
   }
 
   Future<void> _initServices() async {
@@ -80,11 +79,25 @@ class _MedusaAppState extends State<MedusaApp> {
     }
   }
 
-  @override
-  void dispose() {
-    _shakeService.dispose();
-    _powerButtonService.dispose();
-    super.dispose();
+  Future<void> _initBackgroundServices() async {
+    _shakeService.startListening();
+    final isEnabled = await _powerButtonService.isEnabled();
+    if (isEnabled) {
+      _powerButtonService.startListening();
+    }
+  }
+
+  Future<void> _checkOnboarding() async {
+    final prefs = await SharedPreferences.getInstance();
+    final onboardingComplete = prefs.getBool('onboarding_complete') ?? false;
+    final name = prefs.getString('user_name') ?? '';
+    final permissionsAsked = prefs.getBool('permissions_asked') ?? false;
+    
+    setState(() {
+      _showOnboarding = !onboardingComplete;
+      _showPermissions = onboardingComplete && !permissionsAsked;
+      _userName = name;
+    });
   }
 
   void _triggerSos() {
@@ -112,26 +125,14 @@ class _MedusaAppState extends State<MedusaApp> {
     
     setState(() {
       _showOnboarding = false;
+      _showPermissions = true;
       _userName = name;
     });
-
-    if (!mounted) return;
-    _showPermissionDialog();
   }
 
-  void _showPermissionDialog() async {
-    final shouldAsk = await PermissionService.shouldAskPermissions();
-    if (shouldAsk && mounted) {
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (context) => PermissionRequestDialog(
-          onComplete: (results) {
-            setState(() => _permissionsShown = true);
-          },
-        ),
-      );
-    }
+  void _onPermissionsComplete() async {
+    await PermissionService.markPermissionsAsked();
+    setState(() => _showPermissions = false);
   }
 
   @override
@@ -162,15 +163,20 @@ class _MedusaAppState extends State<MedusaApp> {
                 key: const ValueKey('onboarding'),
                 onComplete: _onOnboardingComplete,
               )
-            : _isUnlocked
-                ? HomeScreen(
-                    key: const ValueKey('home'),
-                    userName: _userName,
+            : _showPermissions
+                ? PermissionRequestScreen(
+                    key: const ValueKey('permissions'),
+                    onComplete: _onPermissionsComplete,
                   )
-                : CalculatorDisguiseScreen(
-                    key: const ValueKey('calculator'),
-                    onUnlocked: _onUnlocked,
-                  ),
+                : _isUnlocked
+                    ? HomeScreen(
+                        key: const ValueKey('home'),
+                        userName: _userName,
+                      )
+                    : CalculatorDisguiseScreen(
+                        key: const ValueKey('calculator'),
+                        onUnlocked: _onUnlocked,
+                      ),
       ),
     );
   }

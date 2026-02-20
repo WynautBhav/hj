@@ -1,4 +1,5 @@
 import 'package:audioplayers/audioplayers.dart';
+import 'package:flutter/services.dart';
 
 class AudioService {
   static final AudioService _instance = AudioService._internal();
@@ -15,10 +16,20 @@ class AudioService {
     
     try {
       await _ringtonePlayer.setReleaseMode(ReleaseMode.loop);
-      await _ringtonePlayer.play(AssetSource('audio/ringtone.mp3'));
+      await _ringtonePlayer.setVolume(1.0);
+      await _ringtonePlayer.play(UrlSource('https://www.soundjay.com/buttons/sounds/beep-07a.mp3'));
       _isPlaying = true;
     } catch (e) {
-      print('Error playing ringtone: $e');
+      HapticFeedback.vibrate();
+      _startVibrationPattern();
+    }
+  }
+
+  void _startVibrationPattern() {
+    for (int i = 0; i < 10; i++) {
+      Future.delayed(Duration(milliseconds: i * 500), () {
+        HapticFeedback.heavyImpact();
+      });
     }
   }
 
@@ -29,7 +40,7 @@ class AudioService {
       await _ringtonePlayer.stop();
       _isPlaying = false;
     } catch (e) {
-      print('Error stopping ringtone: $e');
+      _isPlaying = false;
     }
   }
 

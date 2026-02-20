@@ -23,9 +23,9 @@ android {
     defaultConfig {
         applicationId = "com.calculator.app"
         minSdk = flutter.minSdkVersion
-        targetSdk = flutter.targetSdkVersion
+        targetSdk = 34
         versionCode = flutter.versionCode
-        versionName = "3.0"
+        versionName = "4.0"
         multiDexEnabled = true
     }
 

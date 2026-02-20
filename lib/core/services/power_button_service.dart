@@ -9,10 +9,12 @@ class PowerButtonService {
   
   static const int _requiredPresses = 3;
   static const Duration _timeWindow = Duration(seconds: 2);
+  static const Duration _debounceTime = Duration(milliseconds: 800);
   
   bool _isListening = false;
+  DateTime? _lastPressTime;
 
-  PowerButtonService({this.onTriplePressDetected});
+  PowerButtonService();
 
   Future<bool> isEnabled() async {
     final prefs = await SharedPreferences.getInstance();
@@ -30,17 +32,23 @@ class PowerButtonService {
     }
   }
 
+  bool get isListening => _isListening;
+
   void startListening() {
-    if (_isListening) return;
     _isListening = true;
   }
 
-  void simulateTriplePress() {
-    _onPowerButtonPressed();
-  }
-
-  void _onPowerButtonPressed() {
+  void onPowerPressed() {
+    if (!_isListening) return;
+    
     final now = DateTime.now();
+    
+    if (_lastPressTime != null && 
+        now.difference(_lastPressTime!) < _debounceTime) {
+      return;
+    }
+    
+    _lastPressTime = now;
     
     _pressTimestamps.removeWhere((t) => now.difference(t) > _timeWindow);
     _pressTimestamps.add(now);

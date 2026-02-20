@@ -1,15 +1,18 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
+import '../../core/constants/app_colors.dart';
 
 class AppColors {
-  static const Color scaffold     = Color(0xFFF5F5F7);
+  static const Color scaffold     = Color(0xFFF8F5FF);
   static const Color primary      = Color(0xFFFFFFFF);
   static const Color cardBg       = Color(0xFFFFFFFF);
-  static const Color secondary    = Color(0xFFF5F5F5);
-  static const Color textPrimary   = Color(0xFF1A1A1A);
-  static const Color textSecondary = Color(0xFF6B6B6B);
-  static const Color divider       = Color(0xFFE8E8E8);
+  static const Color secondary    = Color(0xFFEDE8FB);
+  static const Color textPrimary   = Color(0xFF1A1A2E);
+  static const Color textSecondary = Color(0xFF6B6B7B);
+  static const Color divider       = Color(0xFFE8E0F0);
   static const Color accent        = Color(0xFF7C5FD6);
   static const Color accentLight   = Color(0xFFEDE8FB);
+  static const Color accentDark    = Color(0xFF5B3CC4);
   static const Color sosRed        = Color(0xFFE53935);
   static const Color sosRedLight   = Color(0xFFFFEBEB);
   static const Color safeGreen     = Color(0xFF34C759);
@@ -17,7 +20,7 @@ class AppColors {
   static const Color warningLight  = Color(0xFFFFF3E0);
   static const Color error         = Color(0xFFE53935);
   static const Color success       = Color(0xFF43A047);
-  static const Color iconColor     = Color(0xFF1A1A1A);
+  static const Color iconColor     = Color(0xFF1A1A2E);
   static const Color cardBackground = Color(0xFFFFFFFF);
 
   static ThemeData get lightTheme {

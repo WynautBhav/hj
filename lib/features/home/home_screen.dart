@@ -1,4 +1,4 @@
-import 'dart:math';
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../../core/constants/app_colors.dart';
@@ -24,7 +24,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   int _selectedIndex = 0;
   late AnimationController _sosPulseController;
 
-  late final List<Widget> _tabs;
+  late List<Widget> _tabs;
 
   @override
   void initState() {
@@ -91,10 +91,10 @@ class _BottomNav extends StatelessWidget {
     return Container(
       height: 80 + mq.padding.bottom,
       decoration: BoxDecoration(
-        color: const Color(0xFF1A1A2E),
+        color: Colors.white,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.3),
+            color: AppColors.accent.withValues(alpha: 0.1),
             blurRadius: 20,
             offset: const Offset(0, -5),
           ),
@@ -175,13 +175,13 @@ class _SosButton extends StatelessWidget {
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                   colors: [
-                    Color(0xFFE53935),
-                    Color(0xFFB71C1C),
+                    AppColors.accent,
+                    AppColors.accentDark,
                   ],
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: const Color(0xFFE53935).withValues(alpha: glowOpacity),
+                    color: AppColors.accent.withValues(alpha: glowOpacity),
                     blurRadius: 20,
                     spreadRadius: 2,
                   ),
@@ -232,7 +232,7 @@ class _NavItem extends StatelessWidget {
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
                 color: selected 
-                    ? Colors.white.withValues(alpha: 0.15)
+                    ? AppColors.accent.withValues(alpha: 0.1)
                     : Colors.transparent,
                 borderRadius: BorderRadius.circular(12),
               ),
@@ -240,8 +240,8 @@ class _NavItem extends StatelessWidget {
                 selected ? activeIcon : icon,
                 size: 22,
                 color: selected 
-                    ? Colors.white 
-                    : Colors.white.withValues(alpha: 0.5),
+                    ? AppColors.accent 
+                    : AppColors.textSecondary,
               ),
             ),
             const SizedBox(height: 4),
@@ -250,9 +250,7 @@ class _NavItem extends StatelessWidget {
               style: TextStyle(
                 fontSize: 10,
                 fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
-                color: selected 
-                    ? Colors.white 
-                    : Colors.white.withValues(alpha: 0.5),
+                color: selected ? AppColors.accent : AppColors.textSecondary,
               ),
             ),
           ],
@@ -271,13 +269,34 @@ class HomeContent extends StatefulWidget {
   State<HomeContent> createState() => _HomeContentState();
 }
 
-class _HomeContentState extends State<HomeContent> {
+class _HomeContentState extends State<HomeContent> with SingleTickerProviderStateMixin {
   List<Contact> _contacts = [];
+  late AnimationController _gaugeController;
+  late Animation<double> _gaugeAnimation;
 
   @override
   void initState() {
     super.initState();
     _loadContacts();
+    
+    _gaugeController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1500),
+    );
+    
+    _gaugeAnimation = Tween<double>(begin: 0, end: 0.78).animate(
+      CurvedAnimation(parent: _gaugeController, curve: Curves.easeOutCubic),
+    );
+    
+    Future.delayed(const Duration(milliseconds: 500), () {
+      if (mounted) _gaugeController.forward();
+    });
+  }
+
+  @override
+  void dispose() {
+    _gaugeController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadContacts() async {
@@ -347,7 +366,7 @@ class _HomeContentState extends State<HomeContent> {
               style: TextStyle(
                 fontSize: 28,
                 fontWeight: FontWeight.w800,
-                color: Color(0xFF7C5FD6),
+                color: AppColors.accent,
               ),
             ),
             const SizedBox(width: 8),
@@ -389,14 +408,14 @@ class _HomeContentState extends State<HomeContent> {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            Color(0xFF1A1A2E),
-            Color(0xFF16213E),
+            AppColors.accent,
+            AppColors.accentDark,
           ],
         ),
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF7C5FD6).withValues(alpha: 0.2),
+            color: AppColors.accent.withValues(alpha: 0.3),
             blurRadius: 20,
             offset: const Offset(0, 8),
           ),
@@ -404,36 +423,41 @@ class _HomeContentState extends State<HomeContent> {
       ),
       child: Row(
         children: [
-          SizedBox(
-            width: 80,
-            height: 80,
-            child: CustomPaint(
-              painter: _ArcGaugePainter(score: 78),
-              child: Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Text(
-                      '78',
-                      style: TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.w800,
-                        color: Colors.white,
-                      ),
+          AnimatedBuilder(
+            animation: _gaugeAnimation,
+            builder: (context, child) {
+              return SizedBox(
+                width: 80,
+                height: 80,
+                child: CustomPaint(
+                  painter: _ArcGaugePainter(score: (_gaugeAnimation.value * 100).round()),
+                  child: Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          '${(_gaugeAnimation.value * 100).round()}',
+                          style: const TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.w800,
+                            color: Colors.white,
+                          ),
+                        ),
+                        Text(
+                          'SCORE',
+                          style: TextStyle(
+                            fontSize: 9,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.white.withValues(alpha: 0.7),
+                            letterSpacing: 1,
+                          ),
+                        ),
+                      ],
                     ),
-                    Text(
-                      'SCORE',
-                      style: TextStyle(
-                        fontSize: 9,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.white.withValues(alpha: 0.7),
-                        letterSpacing: 1,
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
-              ),
-            ),
+              );
+            },
           ),
           const SizedBox(width: 16),
           Expanded(
@@ -453,7 +477,7 @@ class _HomeContentState extends State<HomeContent> {
                   'You\'re in a safe neighborhood. Keep your guards up!',
                   style: TextStyle(
                     fontSize: 13,
-                    color: Colors.white.withValues(alpha: 0.8),
+                    color: Colors.white.withValues(alpha: 0.9),
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -462,24 +486,24 @@ class _HomeContentState extends State<HomeContent> {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
-                        color: Colors.green.withValues(alpha: 0.2),
+                        color: Colors.white.withValues(alpha: 0.2),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(
+                          const Icon(
                             Icons.check_circle_rounded,
                             size: 12,
-                            color: Colors.green.shade300,
+                            color: Colors.white,
                           ),
                           const SizedBox(width: 4),
-                          Text(
+                          const Text(
                             'Low risk area',
                             style: TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.w500,
-                              color: Colors.green.shade300,
+                              color: Colors.white,
                             ),
                           ),
                         ],
@@ -504,15 +528,15 @@ class _HomeContentState extends State<HomeContent> {
         icon: Icons.shield_rounded,
         label: 'SOS Alert',
         subtitle: 'Multi-trigger',
-        color: const Color(0xFFE53935),
-        bgColor: const Color(0xFFFFEBEE),
+        color: AppColors.sosRed,
+        bgColor: AppColors.sosRedLight,
         onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SosScreen())),
       ),
       _QAItem(
         icon: Icons.phone_rounded,
         label: 'Fake Call',
         subtitle: 'Escape danger',
-        color: const Color(0xFF43A047),
+        color: AppColors.safeGreen,
         bgColor: const Color(0xFFE8F5E9),
         onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const FakeCallScreen())),
       ),
@@ -529,7 +553,7 @@ class _HomeContentState extends State<HomeContent> {
         label: 'Evidence',
         subtitle: 'Secured',
         color: const Color(0xFFF57C00),
-        bgColor: const Color(0xFFFFF3E0),
+        bgColor: AppColors.warningLight,
         onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const EvidenceLockerScreen())),
       ),
       _QAItem(
@@ -545,7 +569,7 @@ class _HomeContentState extends State<HomeContent> {
         label: 'More',
         subtitle: 'All features',
         color: const Color(0xFF455A64),
-        bgColor: const Color(0xFFECEFF1),
+        bgColor: AppColors.secondary,
         onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AllFeaturesScreen())),
       ),
     ];
@@ -595,6 +619,13 @@ class _HomeContentState extends State<HomeContent> {
         color: AppColors.primary,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: AppColors.divider),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -614,7 +645,7 @@ class _HomeContentState extends State<HomeContent> {
               _LifecyclePhase(
                 label: 'Before',
                 detail: 'Journey mode, alerts',
-                color: const Color(0xFF43A047),
+                color: AppColors.safeGreen,
                 index: 0,
               ),
               Container(
@@ -625,7 +656,7 @@ class _HomeContentState extends State<HomeContent> {
               _LifecyclePhase(
                 label: 'During',
                 detail: 'SOS, evidence',
-                color: const Color(0xFFE53935),
+                color: AppColors.sosRed,
                 index: 1,
               ),
               Container(
@@ -636,7 +667,7 @@ class _HomeContentState extends State<HomeContent> {
               _LifecyclePhase(
                 label: 'After',
                 detail: 'Legal, FIR',
-                color: const Color(0xFF7C5FD6),
+                color: AppColors.accent,
                 index: 2,
               ),
             ],
@@ -653,16 +684,9 @@ class _HomeContentState extends State<HomeContent> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            const Color(0xFFFFF3E0),
-            const Color(0xFFFFE0B2).withValues(alpha: 0.5),
-          ],
-        ),
+        color: AppColors.accentLight,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFFFB74D).withValues(alpha: 0.3)),
+        border: Border.all(color: AppColors.accent.withValues(alpha: 0.2)),
       ),
       child: Row(
         children: [
@@ -670,12 +694,12 @@ class _HomeContentState extends State<HomeContent> {
             width: 44,
             height: 44,
             decoration: BoxDecoration(
-              color: const Color(0xFFFFB74D).withValues(alpha: 0.2),
+              color: AppColors.accent.withValues(alpha: 0.15),
               shape: BoxShape.circle,
             ),
             child: const Icon(
               Icons.tips_and_updates_rounded,
-              color: Color(0xFFF57C00),
+              color: AppColors.accent,
               size: 22,
             ),
           ),
@@ -689,7 +713,7 @@ class _HomeContentState extends State<HomeContent> {
                   style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w700,
-                    color: Color(0xFF5D4037),
+                    color: AppColors.textPrimary,
                   ),
                 ),
                 const SizedBox(height: 4),
@@ -697,7 +721,7 @@ class _HomeContentState extends State<HomeContent> {
                   'Keep your location sharing ON for instant emergency response.',
                   style: TextStyle(
                     fontSize: 12,
-                    color: const Color(0xFF5D4037).withValues(alpha: 0.8),
+                    color: AppColors.textSecondary,
                   ),
                 ),
               ],
@@ -721,22 +745,22 @@ class _ArcGaugePainter extends CustomPainter {
     final cx = size.width / 2;
     final cy = size.height / 2;
     final radius = (size.width / 2) - 6;
-    const startAngle = pi * 0.75;
-    const sweepFull = pi * 1.5;
+    const startAngle = math.pi * 0.75;
+    const sweepFull = math.pi * 1.5;
 
     final bgPaint = Paint()
-      ..color = Colors.white.withValues(alpha: 0.1)
+      ..color = Colors.white.withValues(alpha: 0.2)
       ..style = PaintingStyle.stroke
       ..strokeCap = StrokeCap.round
       ..strokeWidth = 6;
 
     Color scoreColor;
     if (score >= 70) {
-      scoreColor = Colors.green;
+      scoreColor = Colors.green.shade300;
     } else if (score >= 40) {
-      scoreColor = Colors.orange;
+      scoreColor = Colors.orange.shade300;
     } else {
-      scoreColor = Colors.red;
+      scoreColor = Colors.red.shade300;
     }
 
     final fgPaint = Paint()

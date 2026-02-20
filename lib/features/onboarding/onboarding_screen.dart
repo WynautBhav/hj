@@ -1,3 +1,4 @@
+import 'dart:math' show pi;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -41,15 +42,16 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: Container(
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: [
-              Color(0xFF1A1A2E),
-              Color(0xFF16213E),
-              Color(0xFF0F3460),
+              const Color(0xFF7C5FD6),
+              const Color(0xFF9B7BF5).withValues(alpha: 0.8),
+              Colors.white,
             ],
+            stops: const [0.0, 0.4, 1.0],
           ),
         ),
         child: SafeArea(
@@ -88,17 +90,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       height: 120,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            AppColors.accent.withValues(alpha: 0.8),
-            AppColors.accent,
-          ],
-        ),
+        color: Colors.white,
         boxShadow: [
           BoxShadow(
-            color: AppColors.accent.withValues(alpha: 0.4),
+            color: const Color(0xFF7C5FD6).withValues(alpha: 0.3),
             blurRadius: 30,
             spreadRadius: 5,
           ),
@@ -107,7 +102,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       child: const Icon(
         Icons.shield_rounded,
         size: 60,
-        color: Colors.white,
+        color: Color(0xFF7C5FD6),
       ),
     )
     .animate()
@@ -128,7 +123,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           style: TextStyle(
             fontSize: 32,
             fontWeight: FontWeight.bold,
-            color: Colors.white,
+            color: Color(0xFF1A1A2E),
             letterSpacing: -0.5,
           ),
         )
@@ -143,7 +138,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           textAlign: TextAlign.center,
           style: TextStyle(
             fontSize: 16,
-            color: Colors.white.withValues(alpha: 0.7),
+            color: const Color(0xFF1A1A2E).withValues(alpha: 0.7),
             height: 1.5,
           ),
         )
@@ -160,12 +155,12 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
+          const Text(
             'What should we call you?',
             style: TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.w600,
-              color: Colors.white.withValues(alpha: 0.8),
+              color: Color(0xFF1A1A2E),
               letterSpacing: 0.5,
             ),
           )
@@ -177,29 +172,48 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           Container(
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(16),
-              color: Colors.white.withValues(alpha: 0.1),
-              border: Border.all(
-                color: Colors.white.withValues(alpha: 0.2),
-                width: 1,
-              ),
+              color: Colors.white,
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF7C5FD6).withValues(alpha: 0.15),
+                  blurRadius: 20,
+                  offset: const Offset(0, 8),
+                ),
+              ],
             ),
             child: TextFormField(
               controller: _nameController,
               style: const TextStyle(
                 fontSize: 18,
-                color: Colors.white,
+                color: Color(0xFF1A1A2E),
                 fontWeight: FontWeight.w500,
               ),
               decoration: InputDecoration(
                 hintText: 'Enter your name',
                 hintStyle: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.4),
+                  color: const Color(0xFF1A1A2E).withValues(alpha: 0.4),
                 ),
                 prefixIcon: Icon(
                   Icons.person_outline_rounded,
-                  color: Colors.white.withValues(alpha: 0.6),
+                  color: const Color(0xFF7C5FD6).withValues(alpha: 0.7),
                 ),
-                border: InputBorder.none,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  borderSide: BorderSide.none,
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  borderSide: BorderSide.none,
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  borderSide: const BorderSide(
+                    color: Color(0xFF7C5FD6),
+                    width: 2,
+                  ),
+                ),
+                filled: true,
+                fillColor: Colors.white,
                 contentPadding: const EdgeInsets.symmetric(
                   horizontal: 20,
                   vertical: 18,
@@ -233,12 +247,13 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       child: ElevatedButton(
         onPressed: _isLoading ? null : _saveName,
         style: ElevatedButton.styleFrom(
-          backgroundColor: AppColors.accent,
+          backgroundColor: const Color(0xFF7C5FD6),
           foregroundColor: Colors.white,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
           ),
-          elevation: 0,
+          elevation: 4,
+          shadowColor: const Color(0xFF7C5FD6).withValues(alpha: 0.4),
         ),
         child: _isLoading
             ? const SizedBox(
@@ -271,14 +286,14 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         Icon(
           Icons.lock_outline_rounded,
           size: 14,
-          color: Colors.white.withValues(alpha: 0.4),
+          color: const Color(0xFF1A1A2E).withValues(alpha: 0.5),
         ),
         const SizedBox(width: 6),
         Text(
           'Your data stays private & secure',
           style: TextStyle(
             fontSize: 12,
-            color: Colors.white.withValues(alpha: 0.4),
+            color: const Color(0xFF1A1A2E).withValues(alpha: 0.5),
           ),
         ),
       ],
