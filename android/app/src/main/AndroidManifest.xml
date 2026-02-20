@@ -1,4 +1,5 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
     
     <!-- Core permissions for safety features -->
     <uses-permission android:name="android.permission.SEND_SMS"/>
@@ -16,12 +17,12 @@
     <uses-permission android:name="android.permission.INTERNET"/>
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS"/>
 
-    <!-- FIX #1: Foreground service permissions (Android 12+ requires explicit declaration) -->
+    <!-- Foreground service permissions (Android 12+ requires explicit declaration) -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION"/>
-    <!-- FIX #1: Required for Voice SOS microphone access in foreground service (Android 14+) -->
+    <!-- Required for Voice SOS microphone access in foreground service (Android 14+) -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE"/>
-    <!-- FIX #1: Required for notification permission prompt (Android 13+) -->
+    <!-- Required for notification prompt (Android 13+) -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
 
     <application
@@ -48,6 +49,15 @@
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity>
+
+        <!-- FIX: Override plugin's BackgroundService to add foregroundServiceType="microphone".
+             The flutter_background_service plugin does NOT declare foregroundServiceType,
+             so Android 14+ kills the service when mic is used without it.
+             tools:node="merge" merges our attributes into the plugin's declaration. -->
+        <service
+            android:name="id.flutter.flutter_background_service.BackgroundService"
+            android:foregroundServiceType="microphone"
+            tools:node="merge" />
         
         <receiver 
             android:name="com.dexterous.flutterlocalnotifications.ActionBroadcastReceiver"
