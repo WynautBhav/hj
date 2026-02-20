@@ -20,12 +20,12 @@
 
     <application
         android:label="Calculator"
-        android:name=".SaheliApplication"
+        android:name="com.saheli.saheli.SaheliApplication"
         android:icon="@mipmap/ic_launcher"
         android:requestLegacyExternalStorage="true">
         
         <activity
-            android:name=".MainActivity"
+            android:name="com.saheli.saheli.MainActivity"
             android:exported="true"
             android:launchMode="singleTop"
             android:taskAffinity=""
