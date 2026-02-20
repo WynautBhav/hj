@@ -1,5 +1,4 @@
 import 'dart:math';
-import 'package:geolocator/geolocator.dart';
 import '../models/heatmap_zone.dart';
 import '../models/community_signal.dart';
 import '../services/public_data_api_service.dart';
