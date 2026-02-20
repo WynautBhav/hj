@@ -183,14 +183,10 @@ class _FakeBatteryScreenState extends State<FakeBatteryScreen> {
       debugPrint('Audio recording failed: $e');
     }
 
-    // Start location tracking (permission-gated inside the service)
+    // Start continuous location tracking (permission-gated inside the service)
     try {
-      final hasPermission = await _locationService.checkPermission();
-      if (hasPermission) {
-        // Cache current position for SOS if needed
-        await _locationService.getCurrentPosition();
-        if (mounted) setState(() => _isTracking = true);
-      }
+      final tracking = await _locationService.startTracking();
+      if (mounted) setState(() => _isTracking = tracking);
     } catch (e) {
       debugPrint('Location tracking failed: $e');
     }
@@ -221,6 +217,8 @@ class _FakeBatteryScreenState extends State<FakeBatteryScreen> {
     if (_isRecording) {
       _audioService.stopRecording();
     }
+    // Stop continuous GPS tracking
+    _locationService.stopTracking();
     _audioService.dispose();
     super.dispose();
   }
