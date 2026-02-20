@@ -65,6 +65,7 @@ class _MedusaAppState extends State<MedusaApp> with WidgetsBindingObserver {
   late ShakeService _shakeService;
   late PowerButtonService _powerButtonService;
   Timer? _bgCheckTimer;
+  bool _servicesStarted = false; // Prevents duplicate foreground service starts
 
   @override
   void initState() {
@@ -107,7 +108,11 @@ class _MedusaAppState extends State<MedusaApp> with WidgetsBindingObserver {
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      _initBackgroundServices();
+      // LIFECYCLE SAFETY: Only restart sensor listeners on resume.
+      // Do NOT start foreground service here — it causes
+      // ForegroundServiceStartNotAllowedException on Android 12+
+      // when returning from system settings screens.
+      _safeResumeListeners();
     }
   }
 
@@ -135,14 +140,26 @@ class _MedusaAppState extends State<MedusaApp> with WidgetsBindingObserver {
       debugPrint('Power button service init failed: $e');
     }
 
-    // Start foreground service after other services are ready
+    // LIFECYCLE SAFETY: Do NOT start foreground service in initState().
+    // It's started later in _onUnlocked() after user reaches home screen.
+    // Starting it here would request permissions (opening settings) and then
+    // try to start FG service from background state on return — guaranteed crash.
+  }
+
+  /// Start foreground service + volume SOS ONLY after user reaches home screen.
+  /// This is the ONLY place foreground service is started — user-triggered.
+  Future<void> _startProtectionServices() async {
+    if (_servicesStarted) return;
+    _servicesStarted = true;
+
+    // Start foreground service (deferred to be safe)
     try {
       await MedusaForegroundService.start();
     } catch (e) {
       debugPrint('Foreground service start failed: $e');
     }
 
-    // Start Volume Down ×3 SOS (MediaSession-backed, works on lock screen)
+    // Start Volume Down ×3 SOS (MediaSession-backed)
     try {
       final volumeEnabled = await VolumeSosService.isEnabled();
       if (volumeEnabled) {
@@ -154,7 +171,9 @@ class _MedusaAppState extends State<MedusaApp> with WidgetsBindingObserver {
     }
   }
 
-  Future<void> _initBackgroundServices() async {
+  /// LIFECYCLE SAFETY: Only restart sensor listeners — never start FG service.
+  /// Called on AppLifecycleState.resumed (returning from settings, etc.)
+  Future<void> _safeResumeListeners() async {
     try {
       _shakeService.startListening();
       final isEnabled = await _powerButtonService.isEnabled();
@@ -162,7 +181,7 @@ class _MedusaAppState extends State<MedusaApp> with WidgetsBindingObserver {
         _powerButtonService.startListening();
       }
     } catch (e) {
-      // FIX #8: Never crash on resume
+      // Never crash on resume
     }
   }
 
@@ -205,6 +224,12 @@ class _MedusaAppState extends State<MedusaApp> with WidgetsBindingObserver {
 
   void _onUnlocked() {
     setState(() => _isUnlocked = true);
+
+    // LIFECYCLE SAFETY: Start foreground service ONLY here — after user
+    // has passed calculator disguise and reached home screen.
+    // This guarantees the app is in foreground state when service starts.
+    _startProtectionServices();
+
     // Show battery optimization dialog once after first unlock
     _showBatteryOptimizationHint();
   }

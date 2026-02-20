@@ -272,6 +272,7 @@ class _PermissionRequestScreenState extends State<PermissionRequestScreen> {
   }
 
   Future<void> _requestPermissions() async {
+    if (!mounted) return;
     setState(() => _isRequesting = true);
     
     for (final item in _permissions) {
@@ -281,11 +282,13 @@ class _PermissionRequestScreenState extends State<PermissionRequestScreen> {
         if (item.requiresSpecialHandling) {
           if (item.permission == Permission.systemAlertWindow) {
             status = await Permission.systemAlertWindow.request();
+            // LIFECYCLE SAFETY: re-check mounted after returning from settings
             if (status.isDenied && mounted) {
               _showSystemAlertWindowInstructions();
             }
           } else {
             status = await item.permission.request();
+            // LIFECYCLE SAFETY: re-check mounted after returning from settings
             if (status.isDenied && item.specialMessage != null && mounted) {
               _showSpecialPermissionDialog(item.title, item.specialMessage!);
             }
@@ -294,20 +297,26 @@ class _PermissionRequestScreenState extends State<PermissionRequestScreen> {
           status = await item.permission.request();
         }
         
-        setState(() {
-          _permissionStatus[item.title] = status.isGranted;
-        });
+        // LIFECYCLE SAFETY: re-check mounted before setState
+        if (mounted) {
+          setState(() {
+            _permissionStatus[item.title] = status.isGranted;
+          });
+        }
       } catch (e) {
         debugPrint('Permission request error for ${item.title}: $e');
-        setState(() {
-          _permissionStatus[item.title] = false;
-        });
+        if (mounted) {
+          setState(() {
+            _permissionStatus[item.title] = false;
+          });
+        }
       }
     }
     
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('permissions_asked', true);
     
+    // LIFECYCLE SAFETY: final mounted check before triggering parent callback
     if (mounted) {
       widget.onComplete();
     }

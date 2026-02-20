@@ -43,28 +43,26 @@ class MedusaForegroundService {
   }
 
   /// Start the foreground service. Safe to call multiple times — prevents duplicates.
+  /// LIFECYCLE SAFETY: Does NOT request permissions here — that's done
+  /// separately to avoid opening system settings during service start.
   static Future<bool> start() async {
     if (_isRunning) return true;
 
-    // Request notification permission (Android 13+)
-    if (await Permission.notification.isDenied) {
-      await Permission.notification.request();
-    }
+    try {
+      final result = await FlutterForegroundTask.startService(
+        notificationTitle: '🛡️ Medusa Active',
+        notificationText: 'Safety monitoring is running',
+        callback: _startCallback,
+      );
 
-    // Request battery optimization exemption
-    if (await Permission.ignoreBatteryOptimizations.isDenied) {
-      await Permission.ignoreBatteryOptimizations.request();
-    }
-
-    final result = await FlutterForegroundTask.startService(
-      notificationTitle: '🛡️ Medusa Active',
-      notificationText: 'Safety monitoring is running',
-      callback: _startCallback,
-    );
-
-    if (result is ServiceRequestSuccess) {
-      _isRunning = true;
-      return true;
+      if (result is ServiceRequestSuccess) {
+        _isRunning = true;
+        return true;
+      }
+    } catch (e) {
+      // LIFECYCLE SAFETY: Never crash on service start failure.
+      // This catches ForegroundServiceStartNotAllowedException on Android 12+
+      debugPrint('ForegroundService start error: $e');
     }
     return false;
   }
