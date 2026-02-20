@@ -25,6 +25,12 @@ class VoicePhrase {
     );
   }
 
+  /// Parse from a JSON-encoded string (as stored in SharedPreferences).
+  factory VoicePhrase.fromJsonString(String jsonString) {
+    final Map<String, dynamic> map = jsonDecode(jsonString);
+    return VoicePhrase.fromJson(map);
+  }
+
   Map<String, dynamic> toJson() {
     return {
       'id': id,
@@ -34,6 +40,8 @@ class VoicePhrase {
       'is_active': isActive,
     };
   }
+
+  String toJsonString() => jsonEncode(toJson());
 
   VoicePhrase copyWith({
     String? id,
@@ -54,8 +62,8 @@ class VoicePhrase {
   bool matchesRecognizedText(String recognizedText) {
     final normalizedPhrase = phrase.toLowerCase().trim();
     final normalizedRecognized = recognizedText.toLowerCase().trim();
-    
+
     return normalizedRecognized.contains(normalizedPhrase) ||
-           normalizedPhrase.contains(normalizedRecognized);
+        normalizedPhrase.contains(normalizedRecognized);
   }
 }

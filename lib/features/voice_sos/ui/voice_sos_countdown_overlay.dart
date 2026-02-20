@@ -16,7 +16,8 @@ class VoiceSOSCountdownOverlay extends StatefulWidget {
   });
 
   @override
-  State<VoiceSOSCountdownOverlay> createState() => _VoiceSOSCountdownOverlayState();
+  State<VoiceSOSCountdownOverlay> createState() =>
+      _VoiceSOSCountdownOverlayState();
 }
 
 class _VoiceSOSCountdownOverlayState extends State<VoiceSOSCountdownOverlay>
@@ -29,7 +30,7 @@ class _VoiceSOSCountdownOverlayState extends State<VoiceSOSCountdownOverlay>
   @override
   void initState() {
     super.initState();
-    
+
     _pulseController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1000),
@@ -65,28 +66,28 @@ class _VoiceSOSCountdownOverlayState extends State<VoiceSOSCountdownOverlay>
   }
 
   Future<void> _triggerSOSReal() async {
-    final contactService = ContactService();
-    final contacts = await contactService.getContacts();
-    
-    if (contacts.isNotEmpty) {
-      final locationService = LocationService();
-      final position = await locationService.getCurrentPosition();
-      String message = '🆘 I am in DANGER! My last location: ';
-      
-      if (position != null) {
-        message += locationService.getGoogleMapsLink(
-          position.latitude,
-          position.longitude,
-        );
-      }
-      
-      final smsService = SmsService();
-      await smsService.sendSosSms(contacts, message);
-    }
+    try {
+      final contactService = ContactService();
+      final contacts = await contactService.getContacts();
 
-    await SharedPreferences.getInstance().then((prefs) async {
-      await prefs.setBool('trigger_sos_now', false);
-    });
+      if (contacts.isNotEmpty) {
+        final locationService = LocationService();
+        final position = await locationService.getCurrentPosition();
+        String message = '🆘 I am in DANGER! My last location: ';
+
+        if (position != null) {
+          message += locationService.getGoogleMapsLink(
+            position.latitude,
+            position.longitude,
+          );
+        }
+
+        final smsService = SmsService();
+        await smsService.sendSosSms(contacts, message);
+      }
+    } catch (_) {
+      // Don't crash on SOS trigger failure
+    }
   }
 
   @override
@@ -171,7 +172,7 @@ class _VoiceSOSCountdownOverlayState extends State<VoiceSOSCountdownOverlay>
               ),
               const SizedBox(height: 8),
               const Text(
-                'Say "Cancel" or tap the button below to cancel',
+                'Tap the button below to cancel',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 14,

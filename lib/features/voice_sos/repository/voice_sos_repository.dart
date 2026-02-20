@@ -7,24 +7,20 @@ class VoiceSOSRepository {
   static const String _phraseKey = 'voice_phrase';
   static const String _isArmedKey = 'voice_sos_armed';
 
-  final VoiceSOSService _voiceService;
-
-  VoiceSOSRepository({VoiceSOSService? voiceService})
-      : _voiceService = voiceService ?? VoiceSOSService();
+  final VoiceSOSService _voiceService = VoiceSOSService();
 
   Future<void> initialize() async {
-    await VoiceSOSService.initializeService();
+    // No background service to initialize anymore
   }
 
   Future<VoicePhrase?> getStoredPhrase() async {
     final prefs = await SharedPreferences.getInstance();
     final phraseJson = prefs.getString(_phraseKey);
-    
+
     if (phraseJson == null) return null;
-    
+
     try {
-      final Map<String, dynamic> phraseMap = jsonDecode(phraseJson);
-      return VoicePhrase.fromJson(phraseMap);
+      return VoicePhrase.fromJsonString(phraseJson);
     } catch (e) {
       return null;
     }
@@ -32,7 +28,7 @@ class VoiceSOSRepository {
 
   Future<void> savePhrase(VoicePhrase phrase) async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_phraseKey, jsonEncode(phrase.toJson()));
+    await prefs.setString(_phraseKey, phrase.toJsonString());
   }
 
   Future<void> deletePhrase() async {
@@ -42,45 +38,31 @@ class VoiceSOSRepository {
   }
 
   Future<bool> isArmed() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getBool(_isArmedKey) ?? false;
-  }
-
-  Future<void> setArmed(bool armed) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(_isArmedKey, armed);
+    return _voiceService.isArmed;
   }
 
   Future<bool> armVoiceSOS() async {
-    final phrase = await getStoredPhrase();
-    if (phrase == null) {
-      return false;
-    }
-
-    final started = await VoiceSOSService.startService();
-    if (started) {
-      await setArmed(true);
-      VoiceSOSService.startListening();
-      return true;
-    }
-    return false;
+    return await _voiceService.arm();
   }
 
   Future<void> disarmVoiceSOS() async {
-    VoiceSOSService.stopListening();
-    await VoiceSOSService.stopService();
-    await setArmed(false);
+    await _voiceService.disarm();
   }
 
-  Future<bool> checkPermissions() async {
-    return true;
+  /// Set callbacks on the underlying service
+  void setOnPhraseDetected(Function(String) callback) {
+    _voiceService.onPhraseDetected = callback;
   }
 
-  Stream<Map<String, dynamic>?> get serviceEvents {
-    return VoiceSOSService.onEvent;
+  void setOnRecognized(Function(String) callback) {
+    _voiceService.onRecognized = callback;
+  }
+
+  void setOnError(Function(String) callback) {
+    _voiceService.onError = callback;
   }
 
   void dispose() {
-    VoiceSOSService.dispose();
+    _voiceService.dispose();
   }
 }

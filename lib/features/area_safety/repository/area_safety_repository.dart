@@ -1,3 +1,4 @@
+import 'dart:math';
 import 'package:geolocator/geolocator.dart';
 import '../models/heatmap_zone.dart';
 import '../models/community_signal.dart';
@@ -25,7 +26,7 @@ class AreaSafetyRepository {
     double radiusKm = _defaultRadiusKm,
   }) async {
     final isOnline = await _checkConnectivity();
-    
+
     List<HeatmapZone> publicZones = [];
     DateTime? lastUpdated;
     bool isUsingCached = false;
@@ -34,9 +35,10 @@ class AreaSafetyRepository {
       try {
         final response = await _apiService.fetchPublicData();
         final cachedTimestamp = await _cacheService.getLastUpdateTime();
-        
-        if (cachedTimestamp == null || 
+
+        if (cachedTimestamp == null ||
             response.updatedOn.isAfter(cachedTimestamp)) {
+          publicZones = response.zones;
           await _cacheService.cacheZones(response.zones);
           lastUpdated = response.updatedOn;
         } else {
@@ -74,14 +76,14 @@ class AreaSafetyRepository {
       isOnline: isOnline,
       isUsingCached: isUsingCached,
       hasPublicData: publicZones.isNotEmpty,
-      hasDataInRange: filteredPublicZones.isNotEmpty || communitySignals.isNotEmpty,
+      hasDataInRange:
+          filteredPublicZones.isNotEmpty || communitySignals.isNotEmpty,
     );
   }
 
   Future<bool> _checkConnectivity() async {
     try {
-      final response = await _apiService.checkConnectivity();
-      return response;
+      return await _apiService.checkConnectivity();
     } catch (_) {
       return false;
     }
@@ -94,7 +96,7 @@ class AreaSafetyRepository {
     double radiusKm,
   ) {
     return zones.where((zone) {
-      final distance = calculateDistance(
+      final distance = _haversineDistance(
         centerLat,
         centerLng,
         zone.lat,
@@ -104,7 +106,8 @@ class AreaSafetyRepository {
     }).toList();
   }
 
-  double calculateDistance(
+  /// Haversine formula using dart:math
+  double _haversineDistance(
     double lat1,
     double lon1,
     double lat2,
@@ -113,78 +116,16 @@ class AreaSafetyRepository {
     const double earthRadius = 6371;
     final dLat = _toRadians(lat2 - lat1);
     final dLon = _toRadians(lon2 - lon1);
-    final a = _sin(dLat / 2) * _sin(dLat / 2) +
-        _cos(_toRadians(lat1)) *
-            _cos(_toRadians(lat2)) *
-            _sin(dLon / 2) *
-            _sin(dLon / 2);
-    final c = 2 * _atan2(_sqrt(a), _sqrt(1 - a));
+    final a = sin(dLat / 2) * sin(dLat / 2) +
+        cos(_toRadians(lat1)) *
+            cos(_toRadians(lat2)) *
+            sin(dLon / 2) *
+            sin(dLon / 2);
+    final c = 2 * atan2(sqrt(a), sqrt(1 - a));
     return earthRadius * c;
   }
 
-  double _toRadians(double degrees) => degrees * 3.141592653589793 / 180;
-  double _sin(double x) => _taylorSin(x);
-  double _cos(double x) => _taylorCos(x);
-  double _sqrt(double x) => x > 0 ? _newtonSqrt(x) : 0;
-  double _atan2(double y, double x) => _approximateAtan2(y, x);
-
-  double _taylorSin(double x) {
-    x = x % (2 * 3.141592653589793);
-    if (x > 3.141592653589793) x -= 2 * 3.141592653589793;
-    if (x < -3.141592653589793) x += 2 * 3.141592653589793;
-    double result = x;
-    double term = x;
-    for (int i = 1; i <= 10; i++) {
-      term *= -x * x / ((2 * i) * (2 * i + 1));
-      result += term;
-    }
-    return result;
-  }
-
-  double _taylorCos(double x) {
-    x = x % (2 * 3.141592653589793);
-    double result = 1;
-    double term = 1;
-    for (int i = 1; i <= 10; i++) {
-      term *= -x * x / ((2 * i - 1) * (2 * i));
-      result += term;
-    }
-    return result;
-  }
-
-  double _newtonSqrt(double x) {
-    double guess = x / 2;
-    for (int i = 0; i < 20; i++) {
-      guess = (guess + x / guess) / 2;
-    }
-    return guess;
-  }
-
-  double _approximateAtan2(double y, double x) {
-    if (x == 0) {
-      if (y > 0) return 3.141592653589793 / 2;
-      if (y < 0) return -3.141592653589793 / 2;
-      return 0;
-    }
-    double atan = _approximateAtan(y / x);
-    if (x < 0) {
-      if (y >= 0) return atan + 3.141592653589793;
-      return atan - 3.141592653589793;
-    }
-    return atan;
-  }
-
-  double _approximateAtan(double x) {
-    if (x > 1) return 3.141592653589793 / 2 - _approximateAtan(1 / x);
-    if (x < -1) return -3.141592653589793 / 2 - _approximateAtan(1 / x);
-    double result = x;
-    double term = x;
-    for (int i = 1; i <= 20; i++) {
-      term *= -x * x;
-      result += term / (2 * i + 1);
-    }
-    return result;
-  }
+  double _toRadians(double degrees) => degrees * pi / 180;
 
   Future<void> addCommunitySignal(CommunitySignal signal) async {
     await _communityService.addSignal(signal);

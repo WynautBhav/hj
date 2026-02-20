@@ -5,7 +5,6 @@ import 'package:permission_handler/permission_handler.dart';
 import '../../../core/constants/app_colors.dart';
 import '../models/voice_phrase.dart';
 import '../repository/voice_sos_repository.dart';
-import '../services/voice_sos_service.dart';
 import 'voice_phrase_setup_screen.dart';
 import 'voice_sos_countdown_overlay.dart';
 
@@ -18,12 +17,12 @@ class VoiceSOSScreen extends StatefulWidget {
 
 class _VoiceSOSScreenState extends State<VoiceSOSScreen> {
   final VoiceSOSRepository _repository = VoiceSOSRepository();
-  
+
   VoicePhrase? _storedPhrase;
   bool _isArmed = false;
   bool _isLoading = true;
   bool _isArming = false;
-  StreamSubscription? _eventSubscription;
+  String _lastRecognized = '';
   OverlayEntry? _countdownOverlay;
 
   @override
@@ -35,13 +34,13 @@ class _VoiceSOSScreenState extends State<VoiceSOSScreen> {
   Future<void> _initialize() async {
     await _repository.initialize();
     await _loadState();
-    _listenToServiceEvents();
+    _setupCallbacks();
   }
 
   Future<void> _loadState() async {
     final phrase = await _repository.getStoredPhrase();
     final isArmed = await _repository.isArmed();
-    
+
     if (mounted) {
       setState(() {
         _storedPhrase = phrase;
@@ -51,23 +50,25 @@ class _VoiceSOSScreenState extends State<VoiceSOSScreen> {
     }
   }
 
-  void _listenToServiceEvents() {
-    _eventSubscription = VoiceSOSService.onEvent.listen((event) {
-      if (event == null) return;
+  void _setupCallbacks() {
+    _repository.setOnPhraseDetected((phrase) {
+      if (mounted) _showCountdownOverlay();
+    });
 
-      if (event.containsKey('phrase_detected')) {
-        _onPhraseDetected(event['phrase'] as String);
-      } else if (event.containsKey('error')) {
-        _showError(event['message'] as String);
+    _repository.setOnRecognized((text) {
+      if (mounted) {
+        setState(() => _lastRecognized = text);
       }
+    });
+
+    _repository.setOnError((error) {
+      // Don't show transient speech errors to user during listening
     });
   }
 
-  void _onPhraseDetected(String phrase) {
-    _showCountdownOverlay();
-  }
-
   void _showCountdownOverlay() {
+    if (_countdownOverlay != null) return; // Already showing
+
     _countdownOverlay = OverlayEntry(
       builder: (context) => VoiceSOSCountdownOverlay(
         onCancel: _cancelSOS,
@@ -86,7 +87,15 @@ class _VoiceSOSScreenState extends State<VoiceSOSScreen> {
   void _triggerSOS() {
     _countdownOverlay?.remove();
     _countdownOverlay = null;
-    _showMessage('SOS triggered - Emergency contacts will be notified');
+    _showMessage('SOS triggered — emergency contacts notified');
+  }
+
+  void _showMessage(String message) {
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(message)),
+      );
+    }
   }
 
   void _showError(String message) {
@@ -96,14 +105,6 @@ class _VoiceSOSScreenState extends State<VoiceSOSScreen> {
           content: Text(message),
           backgroundColor: Colors.red,
         ),
-      );
-    }
-  }
-
-  void _showMessage(String message) {
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(message)),
       );
     }
   }
@@ -126,15 +127,13 @@ class _VoiceSOSScreenState extends State<VoiceSOSScreen> {
         return;
       }
 
-      final notificationStatus = await Permission.notification.request();
-      if (!notificationStatus.isGranted) {
-        _showError('Notification permission is required for Voice SOS');
-      }
-
       if (_isArmed) {
         await _repository.disarmVoiceSOS();
         if (mounted) {
-          setState(() => _isArmed = false);
+          setState(() {
+            _isArmed = false;
+            _lastRecognized = '';
+          });
           _showMessage('Voice SOS disarmed');
         }
       } else {
@@ -142,9 +141,9 @@ class _VoiceSOSScreenState extends State<VoiceSOSScreen> {
         if (mounted) {
           setState(() => _isArmed = success);
           if (success) {
-            _showMessage('Voice SOS armed - Say your phrase to trigger');
+            _showMessage('Voice SOS armed — say your phrase to trigger');
           } else {
-            _showError('Failed to start Voice SOS');
+            _showError('Failed to start Voice SOS. Check internet connection.');
           }
         }
       }
@@ -162,7 +161,7 @@ class _VoiceSOSScreenState extends State<VoiceSOSScreen> {
       context,
       MaterialPageRoute(builder: (_) => const VoicePhraseSetupScreen()),
     );
-    
+
     if (result != null) {
       await _repository.savePhrase(result);
       setState(() => _storedPhrase = result);
@@ -171,7 +170,6 @@ class _VoiceSOSScreenState extends State<VoiceSOSScreen> {
 
   @override
   void dispose() {
-    _eventSubscription?.cancel();
     _countdownOverlay?.remove();
     _repository.dispose();
     super.dispose();
@@ -204,6 +202,10 @@ class _VoiceSOSScreenState extends State<VoiceSOSScreen> {
           _buildStatusCard(),
           const SizedBox(height: 24),
           _buildPhraseCard(),
+          if (_isArmed && _lastRecognized.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            _buildRecognizedText(),
+          ],
           const SizedBox(height: 24),
           _buildArmButton(),
           const SizedBox(height: 16),
@@ -269,9 +271,9 @@ class _VoiceSOSScreenState extends State<VoiceSOSScreen> {
         ],
       ),
     )
-    .animate()
-    .fadeIn(duration: 400.ms)
-    .slideY(begin: -0.1, end: 0);
+        .animate()
+        .fadeIn(duration: 400.ms)
+        .slideY(begin: -0.1, end: 0);
   }
 
   Widget _buildStatusCard() {
@@ -294,8 +296,8 @@ class _VoiceSOSScreenState extends State<VoiceSOSScreen> {
             width: 50,
             height: 50,
             decoration: BoxDecoration(
-              color: _isArmed 
-                  ? Colors.green.withValues(alpha: 0.1) 
+              color: _isArmed
+                  ? Colors.green.withValues(alpha: 0.1)
                   : Colors.grey.withValues(alpha: 0.1),
               shape: BoxShape.circle,
             ),
@@ -319,7 +321,7 @@ class _VoiceSOSScreenState extends State<VoiceSOSScreen> {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  _isArmed 
+                  _isArmed
                       ? 'Say your trigger phrase to activate SOS'
                       : 'Tap the button below to arm Voice SOS',
                   style: TextStyle(
@@ -349,9 +351,9 @@ class _VoiceSOSScreenState extends State<VoiceSOSScreen> {
         ],
       ),
     )
-    .animate()
-    .fadeIn(delay: 100.ms, duration: 400.ms)
-    .slideY(begin: 0.1, end: 0);
+        .animate()
+        .fadeIn(delay: 100.ms, duration: 400.ms)
+        .slideY(begin: 0.1, end: 0);
   }
 
   Widget _buildPhraseCard() {
@@ -404,8 +406,8 @@ class _VoiceSOSScreenState extends State<VoiceSOSScreen> {
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w500,
-                      color: _storedPhrase != null 
-                          ? AppColors.accent 
+                      color: _storedPhrase != null
+                          ? AppColors.accent
                           : AppColors.textSecondary,
                     ),
                   ),
@@ -420,9 +422,35 @@ class _VoiceSOSScreenState extends State<VoiceSOSScreen> {
         ),
       ),
     )
-    .animate()
-    .fadeIn(delay: 200.ms, duration: 400.ms)
-    .slideY(begin: 0.1, end: 0);
+        .animate()
+        .fadeIn(delay: 200.ms, duration: 400.ms)
+        .slideY(begin: 0.1, end: 0);
+  }
+
+  Widget _buildRecognizedText() {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.blue.shade50,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.blue.shade100),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.hearing, color: Colors.blue.shade600, size: 20),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              'Heard: "$_lastRecognized"',
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.blue.shade800,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _buildArmButton() {
@@ -454,10 +482,10 @@ class _VoiceSOSScreenState extends State<VoiceSOSScreen> {
                   Icon(_isArmed ? Icons.stop : Icons.mic),
                   const SizedBox(width: 8),
                   Text(
-                    _isArmed 
-                        ? 'DISARM VOICE SOS' 
-                        : _storedPhrase != null 
-                            ? 'ARM VOICE SOS' 
+                    _isArmed
+                        ? 'DISARM VOICE SOS'
+                        : _storedPhrase != null
+                            ? 'ARM VOICE SOS'
                             : 'SET UP PHRASE FIRST',
                     style: const TextStyle(
                       fontSize: 16,
@@ -468,9 +496,9 @@ class _VoiceSOSScreenState extends State<VoiceSOSScreen> {
               ),
       ),
     )
-    .animate()
-    .fadeIn(delay: 300.ms, duration: 400.ms)
-    .slideY(begin: 0.1, end: 0);
+        .animate()
+        .fadeIn(delay: 300.ms, duration: 400.ms)
+        .slideY(begin: 0.1, end: 0);
   }
 
   Widget _buildDisclaimer() {
@@ -487,7 +515,9 @@ class _VoiceSOSScreenState extends State<VoiceSOSScreen> {
           const SizedBox(width: 8),
           Expanded(
             child: Text(
-              'Voice SOS requires internet connection to work. It listens only when you explicitly arm it. Your privacy is protected.',
+              'Voice SOS requires internet connection to work. '
+              'It listens only when you explicitly arm it. '
+              'Your privacy is protected.',
               style: TextStyle(
                 fontSize: 12,
                 color: Colors.blue.shade800,
@@ -497,7 +527,7 @@ class _VoiceSOSScreenState extends State<VoiceSOSScreen> {
         ],
       ),
     )
-    .animate()
-    .fadeIn(delay: 400.ms, duration: 400.ms);
+        .animate()
+        .fadeIn(delay: 400.ms, duration: 400.ms);
   }
 }

@@ -1,168 +1,123 @@
 import 'dart:async';
-import 'dart:ui';
-import 'package:flutter_background_service/flutter_background_service.dart';
-import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/voice_phrase.dart';
-import '../services/speech_recognition_service.dart';
+import 'speech_recognition_service.dart';
 
+/// In-app Voice SOS service. Runs in the foreground (main isolate).
+/// No background service — avoids conflict with the existing one.
 class VoiceSOSService {
-  static const String _serviceName = 'voice_sos_service';
   static const String _phraseKey = 'voice_phrase';
   static const String _isArmedKey = 'voice_sos_armed';
 
-  static final FlutterBackgroundService _service = FlutterBackgroundService();
+  static VoiceSOSService? _instance;
+  factory VoiceSOSService() => _instance ??= VoiceSOSService._();
+  VoiceSOSService._();
 
-  static Future<void> initializeService() async {
-    final service = FlutterBackgroundService();
+  final SpeechRecognitionService _speechService = SpeechRecognitionService();
+  VoicePhrase? _storedPhrase;
+  bool _isArmed = false;
+  bool _isListening = false;
 
-    const AndroidNotificationChannel channel = AndroidNotificationChannel(
-      'voice_sos_channel',
-      'Voice SOS Active',
-      description: 'Listening for your safety phrase',
-      importance: Importance.low,
-      playSound: false,
-      enableVibration: false,
-    );
+  // Callbacks
+  Function(String)? onPhraseDetected;
+  Function(String)? onRecognized;
+  Function(String)? onError;
+  Function()? onListeningStarted;
+  Function()? onListeningStopped;
 
-    final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
-        FlutterLocalNotificationsPlugin();
+  bool get isArmed => _isArmed;
+  bool get isListening => _isListening;
 
-    await flutterLocalNotificationsPlugin
-        .resolvePlatformSpecificImplementation<
-            AndroidFlutterLocalNotificationsPlugin>()
-        ?.createNotificationChannel(channel);
+  Future<bool> arm() async {
+    final prefs = await SharedPreferences.getInstance();
+    final phraseJson = prefs.getString(_phraseKey);
+    if (phraseJson == null) {
+      onError?.call('No phrase configured');
+      return false;
+    }
 
-    await service.configure(
-      androidConfiguration: AndroidConfiguration(
-        onStart: onStart,
-        autoStart: false,
-        isForegroundMode: true,
-        notificationChannelId: 'voice_sos_channel',
-        initialNotificationTitle: 'Voice SOS Active',
-        initialNotificationContent: 'Listening for your safety phrase',
-        foregroundServiceNotificationId: 889,
-        foregroundServiceTypes: [AndroidForegroundType.microphone],
-      ),
-      iosConfiguration: IosConfiguration(
-        autoStart: false,
-        onForeground: onStart,
-        onBackground: onIosBackground,
-      ),
-    );
-  }
+    try {
+      _storedPhrase = VoicePhrase.fromJsonString(phraseJson);
+    } catch (e) {
+      onError?.call('Invalid phrase data');
+      return false;
+    }
 
-  @pragma('vm:entry-point')
-  static Future<bool> onIosBackground(ServiceInstance service) async {
+    final initialized = await _speechService.initialize();
+    if (!initialized) {
+      onError?.call('Speech recognition not available. Check internet.');
+      return false;
+    }
+
+    _isArmed = true;
+    await prefs.setBool(_isArmedKey, true);
+
+    _setupCallbacks();
+    await _startContinuousListening();
     return true;
   }
 
-  @pragma('vm:entry-point')
-  static void onStart(ServiceInstance service) async {
-    DartPluginRegistrant.ensureInitialized();
+  void _setupCallbacks() {
+    _speechService.onResult = (recognizedText) {
+      onRecognized?.call(recognizedText);
 
-    final speechService = SpeechRecognitionService();
-    VoicePhrase? storedPhrase;
-    bool isListening = false;
-
-    service.on('start_listening').listen((event) async {
-      if (isListening) return;
-
-      final prefs = await SharedPreferences.getInstance();
-      final phraseJson = prefs.getString(_phraseKey);
-      
-      if (phraseJson == null) {
-        service.invoke('error', {'message': 'No phrase configured'});
-        return;
+      if (_storedPhrase != null &&
+          _storedPhrase!.matchesRecognizedText(recognizedText)) {
+        onPhraseDetected?.call(_storedPhrase!.phrase);
       }
+    };
 
-      try {
-        final phraseMap = Map<String, dynamic>.from(
-          (phraseJson as Map<String, dynamic>),
-        );
-        storedPhrase = VoicePhrase.fromJson(phraseMap);
-      } catch (e) {
-        service.invoke('error', {'message': 'Invalid phrase data'});
-        return;
+    _speechService.onListeningStopped = () {
+      // Auto-restart listening if still armed
+      if (_isArmed) {
+        Future.delayed(const Duration(milliseconds: 500), () {
+          if (_isArmed) _startContinuousListening();
+        });
       }
+    };
 
-      isListening = true;
-      service.invoke('listening_started');
-
-      await speechService.initialize();
-
-      speechService.onResult = (recognizedText) {
-        service.invoke('recognized', {'text': recognizedText});
-        
-        if (storedPhrase != null && 
-            storedPhrase!.matchesRecognizedText(recognizedText)) {
-          service.invoke('phrase_detected', {'phrase': storedPhrase!.phrase});
-        }
-      };
-
-      speechService.onListeningStopped = () {
-        if (isListening) {
-          speechService.startListening(
-            localeId: storedPhrase?.language ?? 'en_US',
-            targetPhrase: storedPhrase,
-          );
-        }
-      };
-
-      speechService.onError = (error) {
-        service.invoke('error', {'message': error});
-      };
-
-      await speechService.startListening(
-        localeId: storedPhrase?.language ?? 'en_US',
-        targetPhrase: storedPhrase,
-      );
-    });
-
-    service.on('stop_listening').listen((event) async {
-      isListening = false;
-      await speechService.stopListening();
-      service.invoke('listening_stopped');
-    });
-
-    service.on('dispose').listen((event) {
-      speechService.dispose();
-      service.stopSelf();
-    });
+    _speechService.onError = (error) {
+      onError?.call(error);
+      // Try to restart on recoverable errors
+      if (_isArmed) {
+        Future.delayed(const Duration(seconds: 2), () {
+          if (_isArmed) _startContinuousListening();
+        });
+      }
+    };
   }
 
-  static Future<bool> startService() async {
-    final isRunning = await _service.isRunning();
-    if (!isRunning) {
-      return await _service.startService();
-    }
-    return true;
+  Future<void> _startContinuousListening() async {
+    if (!_isArmed || _isListening) return;
+
+    _isListening = true;
+    onListeningStarted?.call();
+
+    await _speechService.startListening(
+      localeId: _storedPhrase?.language ?? 'en_US',
+      targetPhrase: _storedPhrase,
+    );
   }
 
-  static Future<void> stopService() async {
-    final isRunning = await _service.isRunning();
-    if (isRunning) {
-      _service.invoke('stop_listening');
-    }
+  Future<void> disarm() async {
+    _isArmed = false;
+    _isListening = false;
+
+    await _speechService.stopListening();
+    onListeningStopped?.call();
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_isArmedKey, false);
   }
 
-  static Future<bool> isRunning() async {
-    return await _service.isRunning();
+  Future<bool> isServiceArmed() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool(_isArmedKey) ?? false;
   }
 
-  static Stream<Map<String, dynamic>?> get onEvent {
-    return _service.on('update');
-  }
-
-  static void startListening() {
-    _service.invoke('start_listening');
-  }
-
-  static void stopListening() {
-    _service.invoke('stop_listening');
-  }
-
-  static Future<void> dispose() async {
-    _service.invoke('dispose');
+  void dispose() {
+    _isArmed = false;
+    _isListening = false;
+    _speechService.dispose();
   }
 }

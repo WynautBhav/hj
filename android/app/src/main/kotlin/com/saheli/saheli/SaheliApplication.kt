@@ -1,13 +1,13 @@
 package com.saheli.saheli
 
-import io.flutter.app.FlutterApplication
+import android.app.Application
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.os.Build
 
-class SaheliApplication : FlutterApplication() {
+class SaheliApplication : Application() {
     var screenStateListener: ((Boolean) -> Unit)? = null
 
     private val screenReceiver = object : BroadcastReceiver() {
@@ -25,16 +25,9 @@ class SaheliApplication : FlutterApplication() {
             addAction(Intent.ACTION_SCREEN_ON)
             addAction(Intent.ACTION_SCREEN_OFF)
         }
-        
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            // Screen events are system broadcasts, but on modern Android 
-            // some devices require explicit flags even for system ones if registered in app process.
-            // Using RECEIVER_EXPORTED as these are system-wide events we listen to.
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                registerReceiver(screenReceiver, filter, Context.RECEIVER_EXPORTED)
-            } else {
-                registerReceiver(screenReceiver, filter)
-            }
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(screenReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
         } else {
             registerReceiver(screenReceiver, filter)
         }
@@ -43,9 +36,7 @@ class SaheliApplication : FlutterApplication() {
     override fun onTerminate() {
         try {
             unregisterReceiver(screenReceiver)
-        } catch (e: Exception) {
-            // Ignore if not registered
-        }
+        } catch (_: Exception) {}
         super.onTerminate()
     }
 }
