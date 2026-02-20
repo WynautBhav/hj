@@ -13,6 +13,7 @@ import 'features/onboarding/onboarding_screen.dart';
 import 'features/permission/permission_request_screen.dart';
 import 'features/fake_call/fake_call_screen.dart';
 import 'core/services/background_service.dart';
+import 'core/services/foreground_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -25,6 +26,13 @@ void main() async {
     await initializeBackgroundService();
   } catch (e) {
     debugPrint('Background service init failed: $e');
+  }
+
+  // Initialize foreground task (just configures — does NOT start service yet)
+  try {
+    await MedusaForegroundService.init();
+  } catch (e) {
+    debugPrint('Foreground task init failed: $e');
   }
   
   SystemChrome.setPreferredOrientations([
@@ -123,6 +131,13 @@ class _MedusaAppState extends State<MedusaApp> with WidgetsBindingObserver {
     } catch (e) {
       _powerButtonService = PowerButtonService();
       debugPrint('Power button service init failed: $e');
+    }
+
+    // Start foreground service after other services are ready
+    try {
+      await MedusaForegroundService.start();
+    } catch (e) {
+      debugPrint('Foreground service start failed: $e');
     }
   }
 

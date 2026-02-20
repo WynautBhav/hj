@@ -23,6 +23,7 @@ dependencies:
   permission_handler: ^11.3.0
   flutter_background_service: ^5.0.0
   flutter_background_service_android: ^6.0.0
+  flutter_foreground_task: ^8.11.0
   
   sensors_plus: ^5.0.1
   battery_plus: ^6.0.1
