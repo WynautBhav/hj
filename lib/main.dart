@@ -14,6 +14,8 @@ import 'features/permission/permission_request_screen.dart';
 import 'features/fake_call/fake_call_screen.dart';
 import 'core/services/background_service.dart';
 import 'core/services/foreground_service.dart';
+import 'core/services/volume_sos_service.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -139,6 +141,17 @@ class _MedusaAppState extends State<MedusaApp> with WidgetsBindingObserver {
     } catch (e) {
       debugPrint('Foreground service start failed: $e');
     }
+
+    // Start Volume Down ×3 SOS (MediaSession-backed, works on lock screen)
+    try {
+      final volumeEnabled = await VolumeSosService.isEnabled();
+      if (volumeEnabled) {
+        VolumeSosService.onTriplePressDetected = _triggerSos;
+        await VolumeSosService.start();
+      }
+    } catch (e) {
+      debugPrint('Volume SOS init failed: $e');
+    }
   }
 
   Future<void> _initBackgroundServices() async {
@@ -192,6 +205,59 @@ class _MedusaAppState extends State<MedusaApp> with WidgetsBindingObserver {
 
   void _onUnlocked() {
     setState(() => _isUnlocked = true);
+    // Show battery optimization dialog once after first unlock
+    _showBatteryOptimizationHint();
+  }
+
+  /// One-time, non-blocking battery optimization suggestion.
+  /// Shown only once — dismissed permanently via SharedPreferences.
+  Future<void> _showBatteryOptimizationHint() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (prefs.getBool('battery_opt_dismissed') == true) return;
+
+    final isIgnoring = await Permission.ignoreBatteryOptimizations.isGranted;
+    if (isIgnoring) return;
+
+    // Small delay so home screen renders first
+    await Future.delayed(const Duration(seconds: 2));
+    if (!mounted) return;
+
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Row(
+          children: [
+            Icon(Icons.battery_alert_rounded, color: Colors.orange, size: 24),
+            SizedBox(width: 10),
+            Text('Background Protection', style: TextStyle(fontSize: 17)),
+          ],
+        ),
+        content: const Text(
+          'To keep Medusa protection active in the background, '
+          'please disable battery optimization for this app.',
+          style: TextStyle(fontSize: 14, height: 1.5),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () async {
+              await prefs.setBool('battery_opt_dismissed', true);
+              if (ctx.mounted) Navigator.pop(ctx);
+            },
+            child: const Text('Later'),
+          ),
+          FilledButton(
+            onPressed: () async {
+              await prefs.setBool('battery_opt_dismissed', true);
+              await openAppSettings();
+              if (ctx.mounted) Navigator.pop(ctx);
+            },
+            child: const Text('Open Settings'),
+          ),
+        ],
+      ),
+    );
   }
 
   void _onOnboardingComplete() async {
