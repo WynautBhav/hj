@@ -16,11 +16,15 @@ import 'core/services/background_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // FIX #2 + #8: Initialize background service configuration ONLY.
+  // This just creates the notification channel and configures the service.
+  // The actual service is NOT started here (autoStart: false).
+  // Wrapped in try-catch so init failure never kills the app.
   try {
     await initializeBackgroundService();
   } catch (e) {
     debugPrint('Background service init failed: $e');
-    // App continues without background service rather than crashing
   }
   
   SystemChrome.setPreferredOrientations([
@@ -62,15 +66,21 @@ class _MedusaAppState extends State<MedusaApp> with WidgetsBindingObserver {
   }
 
   void _startBackgroundListener() {
+    // FIX #6: Poll SharedPreferences for SOS/fake-call triggers from background.
+    // This is the ONLY bridge between the background isolate and the UI.
     _bgCheckTimer = Timer.periodic(const Duration(seconds: 1), (timer) async {
-      final prefs = await SharedPreferences.getInstance();
-      if (prefs.getBool('trigger_sos_now') == true) {
-        await prefs.setBool('trigger_sos_now', false);
-        _triggerSos();
-      }
-      if (prefs.getBool('trigger_fake_call_now') == true) {
-        await prefs.setBool('trigger_fake_call_now', false);
-        _triggerFakeCall();
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        if (prefs.getBool('trigger_sos_now') == true) {
+          await prefs.setBool('trigger_sos_now', false);
+          _triggerSos();
+        }
+        if (prefs.getBool('trigger_fake_call_now') == true) {
+          await prefs.setBool('trigger_fake_call_now', false);
+          _triggerFakeCall();
+        }
+      } catch (e) {
+        // FIX #8: SharedPreferences can throw on concurrent access
       }
     });
   }
@@ -92,24 +102,39 @@ class _MedusaAppState extends State<MedusaApp> with WidgetsBindingObserver {
   }
 
   Future<void> _initServices() async {
-    _shakeService = ShakeService();
-    await _shakeService.init();
-    _shakeService.onShakeDetected = _triggerSos;
-    _shakeService.startListening();
+    // FIX #8: Wrap service init in try-catch — accelerometer may not be available
+    try {
+      _shakeService = ShakeService();
+      await _shakeService.init();
+      _shakeService.onShakeDetected = _triggerSos;
+      _shakeService.startListening();
+    } catch (e) {
+      _shakeService = ShakeService(); // Fallback: create but don't listen
+      debugPrint('Shake service init failed: $e');
+    }
 
-    _powerButtonService = PowerButtonService();
-    _powerButtonService.onTriplePressDetected = _triggerSos;
-    final isEnabled = await _powerButtonService.isEnabled();
-    if (isEnabled) {
-      _powerButtonService.startListening();
+    try {
+      _powerButtonService = PowerButtonService();
+      _powerButtonService.onTriplePressDetected = _triggerSos;
+      final isEnabled = await _powerButtonService.isEnabled();
+      if (isEnabled) {
+        _powerButtonService.startListening();
+      }
+    } catch (e) {
+      _powerButtonService = PowerButtonService();
+      debugPrint('Power button service init failed: $e');
     }
   }
 
   Future<void> _initBackgroundServices() async {
-    _shakeService.startListening();
-    final isEnabled = await _powerButtonService.isEnabled();
-    if (isEnabled) {
-      _powerButtonService.startListening();
+    try {
+      _shakeService.startListening();
+      final isEnabled = await _powerButtonService.isEnabled();
+      if (isEnabled) {
+        _powerButtonService.startListening();
+      }
+    } catch (e) {
+      // FIX #8: Never crash on resume
     }
   }
 
