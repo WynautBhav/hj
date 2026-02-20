@@ -1,6 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_animate/flutter_animate.dart';
-import '../../core/constants/app_colors.dart';
 
 class AppColors {
   static const Color scaffold     = Color(0xFFF8F5FF);

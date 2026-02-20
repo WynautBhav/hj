@@ -16,7 +16,12 @@ import 'core/services/background_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await initializeBackgroundService();
+  try {
+    await initializeBackgroundService();
+  } catch (e) {
+    debugPrint('Background service init failed: $e');
+    // App continues without background service rather than crashing
+  }
   
   SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,

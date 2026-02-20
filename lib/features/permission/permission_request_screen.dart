@@ -56,15 +56,6 @@ class _PermissionRequestScreenState extends State<PermissionRequestScreen> {
       permission: Permission.notification,
       color: Colors.purple,
     ),
-    _PermissionItem(
-      icon: Icons.layers_rounded,
-      title: 'Display Over Apps',
-      description: 'Required for Fake Call & Background SOS',
-      permission: Permission.systemAlertWindow,
-      color: Colors.indigo,
-      requiresSpecialHandling: true,
-      specialMessage: 'Display over other apps requires special permission. After tapping Grant, you\'ll be redirected to settings.',
-    ),
   ];
 
   @override
