@@ -32,6 +32,10 @@ class JourneyModeService {
   }
 
   Future<void> startJourney({double? destLat, double? destLng}) async {
+    // FIX #4: Request location permission before tracking
+    final hasPermission = await _locationService.checkPermission();
+    if (!hasPermission) return;
+    
     final position = await _locationService.getCurrentPosition();
     if (position == null) return;
     

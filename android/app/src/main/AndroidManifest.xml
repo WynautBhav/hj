@@ -26,6 +26,9 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <!-- FIX #2: Required for Fake Call overlay and emergency screens -->
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW"/>
+    <!-- FIX #5: Required for Guardian Mode BLE scanning (Android 12+) -->
+    <uses-permission android:name="android.permission.BLUETOOTH_SCAN"/>
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT"/>
 
     <application
         android:label="Calculator"

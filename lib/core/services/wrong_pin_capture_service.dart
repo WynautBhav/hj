@@ -37,9 +37,16 @@ class WrongPinCaptureService {
       _cameras = await availableCameras();
       if (_cameras == null || _cameras!.isEmpty) return;
       
+      // FIX #2: Select FRONT camera for intruder selfie capture
+      // Falls back to first available camera if no front camera found
+      final frontCamera = _cameras!.firstWhere(
+        (camera) => camera.lensDirection == CameraLensDirection.front,
+        orElse: () => _cameras!.first,
+      );
+      
       _cameraController = CameraController(
-        _cameras!.first,
-        ResolutionPreset.high,
+        frontCamera,
+        ResolutionPreset.medium,
         enableAudio: false,
       );
       

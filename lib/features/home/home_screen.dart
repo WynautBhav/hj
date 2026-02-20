@@ -602,7 +602,8 @@ class _HomeContentState extends State<HomeContent> with SingleTickerProviderStat
             crossAxisCount: 3,
             mainAxisSpacing: 12,
             crossAxisSpacing: 12,
-            childAspectRatio: 0.95,
+            // FIX #1: Increased height ratio to prevent text overflow on small screens
+            childAspectRatio: 0.85,
           ),
           itemBuilder: (context, i) => _QuickActionCard(
             item: actions[i],
@@ -880,7 +881,8 @@ class _QuickActionCard extends StatelessWidget {
     return GestureDetector(
       onTap: item.onTap,
       child: Container(
-        padding: const EdgeInsets.all(14),
+        // FIX #1: Reduced padding to prevent overflow on small screens
+        padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
           color: AppColors.primary,
           borderRadius: BorderRadius.circular(18),
@@ -897,29 +899,38 @@ class _QuickActionCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Container(
-              width: 42,
-              height: 42,
+              width: 38,
+              height: 38,
               decoration: BoxDecoration(
                 color: item.bgColor,
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(10),
               ),
-              child: Icon(item.icon, color: item.color, size: 20),
+              child: Icon(item.icon, color: item.color, size: 18),
             ),
-            const Spacer(),
-            Text(
-              item.label,
-              style: const TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                color: AppColors.textPrimary,
+            const SizedBox(height: 8),
+            // FIX #1: Flexible + maxLines prevents text overflow
+            Flexible(
+              child: Text(
+                item.label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textPrimary,
+                ),
               ),
             ),
             const SizedBox(height: 2),
-            Text(
-              item.subtitle,
-              style: const TextStyle(
-                fontSize: 11,
-                color: AppColors.textSecondary,
+            Flexible(
+              child: Text(
+                item.subtitle,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 10,
+                  color: AppColors.textSecondary,
+                ),
               ),
             ),
           ],

@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class GuardianService {
@@ -35,8 +36,30 @@ class GuardianService {
     await prefs.setBool(_enabledKey, enabled);
   }
 
+  /// FIX #5: Request BT runtime permissions before scanning (Android 12+ requires this)
+  Future<bool> _requestBluetoothPermissions() async {
+    try {
+      final btScan = await Permission.bluetoothScan.request();
+      final btConnect = await Permission.bluetoothConnect.request();
+      final location = await Permission.location.request();
+      
+      if (!btScan.isGranted || !btConnect.isGranted || !location.isGranted) {
+        onError?.call('Bluetooth and location permissions are required');
+        return false;
+      }
+      return true;
+    } catch (e) {
+      onError?.call('Failed to request permissions');
+      return false;
+    }
+  }
+
   Future<void> startScan() async {
     if (_isScanning) return;
+    
+    // FIX #5: Request runtime permissions before scanning
+    final hasPermissions = await _requestBluetoothPermissions();
+    if (!hasPermissions) return;
     
     final isOn = await isBluetoothOn();
     if (!isOn) {
@@ -47,14 +70,18 @@ class GuardianService {
     _isScanning = true;
     _discoveredDevices.clear();
 
-    _scanSubscription = FlutterBluePlus.scanResults.listen((results) {
-      _discoveredDevices = results.map((r) => r.device).toList();
-      onDevicesFound?.call(_discoveredDevices);
-    });
+    try {
+      _scanSubscription = FlutterBluePlus.scanResults.listen((results) {
+        _discoveredDevices = results.map((r) => r.device).toList();
+        onDevicesFound?.call(_discoveredDevices);
+      });
 
-    await FlutterBluePlus.startScan(timeout: const Duration(seconds: 10));
-    
-    await Future.delayed(const Duration(seconds: 10));
+      await FlutterBluePlus.startScan(timeout: const Duration(seconds: 10));
+      
+      await Future.delayed(const Duration(seconds: 10));
+    } catch (e) {
+      onError?.call('Scan failed: ${e.toString()}');
+    }
     _isScanning = false;
   }
 
