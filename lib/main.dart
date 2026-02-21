@@ -24,6 +24,7 @@ import 'core/services/scream_detection_service.dart';
 import 'features/voice_sos/services/voice_sos_service.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
+import 'core/services/fake_call_notification_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -38,6 +39,13 @@ void main() async {
     await MedusaForegroundService.init();
   } catch (e) {
     debugPrint('Foreground task init failed: $e');
+  }
+
+  // Initialize fake call notification channel
+  try {
+    await FakeCallNotificationService.init();
+  } catch (e) {
+    debugPrint('Fake call notification init failed: $e');
   }
 
   SystemChrome.setPreferredOrientations([
@@ -129,7 +137,7 @@ class _MedusaAppState extends State<MedusaApp> with WidgetsBindingObserver {
     try {
       final voiceSos = VoiceSOSService();
       if (voiceSos.isArmed && !voiceSos.isListening) {
-        await voiceSos.arm();
+        await voiceSos.rearm();
         voiceSos.onPhraseDetected = (_) => _triggerSos('voice');
       }
     } catch (e) {

@@ -7,6 +7,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/services/audio_service.dart';
 import '../../core/services/foreground_service.dart';
+import '../../core/services/fake_call_notification_service.dart';
 
 class FakeCallScreen extends StatefulWidget {
   const FakeCallScreen({super.key});
@@ -78,7 +79,7 @@ class _FakeCallScreenState extends State<FakeCallScreen>
     }
   }
 
-  void _triggerRinging() {
+  void _triggerRinging() async {
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
     setState(() {
       _isCallActive = true;
@@ -88,7 +89,10 @@ class _FakeCallScreenState extends State<FakeCallScreen>
     _audioService.playRingtone();
     _startVibration();
 
-    // Update foreground notification to call style
+    // Full-screen intent notification — shows on lockscreen like a real call
+    await FakeCallNotificationService.showIncomingCall(_callerName);
+
+    // Also update foreground notification bar text
     MedusaForegroundService.updateNotification(
       title: '📞 Incoming Call',
       text: _callerName,
@@ -114,6 +118,9 @@ class _FakeCallScreenState extends State<FakeCallScreen>
       setState(() => _callDuration++);
     });
 
+    // Dismiss full-screen intent notification (call accepted)
+    FakeCallNotificationService.dismissCall();
+
     // Update notification to ongoing call
     MedusaForegroundService.updateNotification(
       title: '📞 Call in progress',
@@ -131,7 +138,10 @@ class _FakeCallScreenState extends State<FakeCallScreen>
       _callDuration = 0;
     });
 
-    // Reset notification
+    // Dismiss full-screen intent notification
+    FakeCallNotificationService.dismissCall();
+
+    // Reset foreground notification
     MedusaForegroundService.resetNotification();
 
     if (mounted && Navigator.canPop(context)) {

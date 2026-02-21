@@ -174,6 +174,20 @@ class VoiceSOSService {
     await prefs.setBool(_isArmedKey, false);
   }
 
+  /// Re-arm: restart listening without full permission re-check.
+  /// Called by heartbeat when STT session dies in background.
+  Future<void> rearm() async {
+    if (!_isArmed) return;
+    _isListening = false;
+    try {
+      await _initializeSpeech();
+      _setupCallbacks();
+      await _startContinuousListening();
+    } catch (e) {
+      // Retry will happen via heartbeat on next cycle
+    }
+  }
+
   Future<bool> isServiceArmed() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getBool(_isArmedKey) ?? false;
