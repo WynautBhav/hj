@@ -51,6 +51,8 @@ class _SosScreenState extends State<SosScreen> with TickerProviderStateMixin {
     _timer?.cancel();
     _pulseController.dispose();
     _ringController.dispose();
+    FlashlightService().stopSos();
+    AudioRecordingService().stopRecording();
     super.dispose();
   }
 

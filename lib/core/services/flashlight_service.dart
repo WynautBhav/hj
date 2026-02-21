@@ -3,6 +3,10 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:torch_light/torch_light.dart';
 
 class FlashlightService {
+  static final FlashlightService _instance = FlashlightService._internal();
+  factory FlashlightService() => _instance;
+  FlashlightService._internal();
+
   static const String _enabledKey = 'flashlight_sos_enabled';
   
   Timer? _sosTimer;

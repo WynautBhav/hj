@@ -5,6 +5,10 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 class AudioRecordingService {
+  static final AudioRecordingService _instance = AudioRecordingService._internal();
+  factory AudioRecordingService() => _instance;
+  AudioRecordingService._internal();
+
   static const String _enabledKey = 'audio_recording_enabled';
   static const String _autoRecordKey = 'audio_auto_record';
   
@@ -14,8 +18,6 @@ class AudioRecordingService {
   DateTime? _recordingStartTime;
   
   static const int maxRecordingDurationMinutes = 30;
-
-  AudioRecordingService();
 
   Future<bool> isEnabled() async {
     final prefs = await SharedPreferences.getInstance();

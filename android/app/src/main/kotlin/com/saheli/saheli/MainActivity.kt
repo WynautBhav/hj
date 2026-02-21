@@ -209,9 +209,14 @@ class MainActivity : FlutterActivity() {
         }
 
         try {
-            val smsManager: SmsManager = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                this.getSystemService(SmsManager::class.java)
-            } else {
+            val smsManager: SmsManager = try {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    this.getSystemService(SmsManager::class.java) ?: SmsManager.getDefault()
+                } else {
+                    @Suppress("DEPRECATION")
+                    SmsManager.getDefault()
+                }
+            } catch (e: Exception) {
                 @Suppress("DEPRECATION")
                 SmsManager.getDefault()
             }
