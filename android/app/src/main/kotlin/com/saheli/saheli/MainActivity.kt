@@ -197,30 +197,11 @@ class MainActivity : FlutterActivity() {
 
     private var smsRequestCodeCounter = 0
 
-    private fun isAirplaneModeOn(): Boolean {
-        return Settings.Global.getInt(contentResolver, Settings.Global.AIRPLANE_MODE_ON, 0) != 0
-    }
-
-    private fun isSimActive(): Boolean {
-        val telephonyManager = getSystemService(Context.TELEPHONY_SERVICE) as TelephonyManager
-        return telephonyManager.simState == TelephonyManager.SIM_STATE_READY
-    }
-
     private fun sanitizePhone(phone: String): String {
         return phone.trim().replace(Regex("[^+\\d]"), "")
     }
 
     private fun sendSmsNatively(phone: String, message: String, result: MethodChannel.Result) {
-        if (isAirplaneModeOn()) {
-            android.util.Log.e("MedusaSMS", "Airplane mode is ON")
-            result.success(false)
-            return
-        }
-        if (!isSimActive()) {
-            android.util.Log.e("MedusaSMS", "SIM is not ready")
-            result.success(false)
-            return
-        }
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.SEND_SMS) != PackageManager.PERMISSION_GRANTED) {
             android.util.Log.e("MedusaSMS", "Permission denied")
             result.success(false)
@@ -248,9 +229,11 @@ class MainActivity : FlutterActivity() {
                     partsCompleted++
                     if (resultCode == Activity.RESULT_OK) {
                         anySuccess = true
+                    } else {
+                        android.util.Log.e("MedusaSMS", "SMS failed with resultCode: $resultCode")
                     }
                     
-                    if (partsCompleted == totalParts) {
+                    if (partsCompleted >= totalParts) {
                         try {
                             context?.unregisterReceiver(this)
                         } catch (e: Exception) {}
@@ -261,7 +244,7 @@ class MainActivity : FlutterActivity() {
             
             val intentFilter = IntentFilter(action)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                applicationContext.registerReceiver(receiver, intentFilter, Context.RECEIVER_NOT_EXPORTED)
+                applicationContext.registerReceiver(receiver, intentFilter, Context.RECEIVER_EXPORTED)
             } else {
                 applicationContext.registerReceiver(receiver, intentFilter)
             }
@@ -269,6 +252,7 @@ class MainActivity : FlutterActivity() {
             val sentIntents = ArrayList<PendingIntent>()
             for (i in 0 until totalParts) {
                 val intent = Intent(action)
+                intent.setPackage(applicationContext.packageName) // Critical for routing system intent explicitly
                 val pi = PendingIntent.getBroadcast(
                     applicationContext, i, intent, 
                     PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT

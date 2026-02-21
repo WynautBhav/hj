@@ -120,7 +120,7 @@ class SmsService {
       final result = await shieldChannel.invokeMethod<bool>('sendSms', {
         'phone': _sanitizePhone(phone),
         'message': message,
-      }).timeout(const Duration(seconds: 5));
+      }).timeout(const Duration(seconds: 45));
       return result ?? false;
     } catch (e) {
       debugPrint('Failed to send native SMS to $phone: $e');
