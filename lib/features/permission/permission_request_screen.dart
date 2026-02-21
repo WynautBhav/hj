@@ -30,6 +30,8 @@ class _PermissionRequestScreenState extends State<PermissionRequestScreen> {
       description: 'Send emergency alerts to contacts',
       permission: Permission.sms,
       color: Colors.blue,
+      requiresSpecialHandling: true,
+      specialMessage: 'Android 13+ blocks SMS for downloaded APKs.\n\nTo fix:\n1. Tap "Open Settings" below.\n2. Tap the 3 dots (⋮) in the top right corner.\n3. Tap "Allow restricted settings".\n4. Authenticate with fingerprint/PIN.\n5. Tap Permissions -> SMS -> Allow.',
     ),
     _PermissionItem(
       icon: Icons.camera_alt_rounded,
@@ -287,7 +289,7 @@ class _PermissionRequestScreenState extends State<PermissionRequestScreen> {
           } else {
             status = await item.permission.request();
             // LIFECYCLE SAFETY: re-check mounted after returning from settings
-            if (status.isDenied && item.specialMessage != null && mounted) {
+            if (!status.isGranted && item.specialMessage != null && mounted) {
               _showSpecialPermissionDialog(item.title, item.specialMessage!);
             }
           }
