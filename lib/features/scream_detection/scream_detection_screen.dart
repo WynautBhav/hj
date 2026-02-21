@@ -30,7 +30,7 @@ class _ScreamDetectionScreenState extends State<ScreamDetectionScreen> {
     final threshold = await _service.getThreshold();
     setState(() {
       _isEnabled = isEnabled;
-      _threshold = threshold;
+      _threshold = threshold.clamp(30.0, 100.0);
       _isActive = _service.isActive;
     });
   }
@@ -221,14 +221,14 @@ class _ScreamDetectionScreenState extends State<ScreamDetectionScreen> {
                 const SizedBox(height: 12),
                 Slider(
                   value: _threshold,
-                  min: 50,
+                  min: 30,
                   max: 100,
-                  divisions: 10,
+                  divisions: 14,
                   label: '${_threshold.toInt()} dB',
                   onChanged: _isEnabled ? _setThreshold : null,
                 ),
                 const Text(
-                  'Lower = more sensitive, Higher = requires louder scream',
+                  '30 dB = very sensitive · 100 dB = only loud screams',
                   style: TextStyle(
                     color: AppColors.textSecondary,
                     fontSize: 12,

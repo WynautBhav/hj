@@ -29,7 +29,8 @@ class ScreamDetectionService {
 
   Future<double> getThreshold() async {
     final prefs = await SharedPreferences.getInstance();
-    return prefs.getDouble(_thresholdKey) ?? defaultThreshold;
+    final value = prefs.getDouble(_thresholdKey) ?? defaultThreshold;
+    return value.clamp(30.0, 100.0);
   }
 
   Future<void> setEnabled(bool enabled) async {
