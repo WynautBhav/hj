@@ -1,5 +1,7 @@
+import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/services.dart';
+import 'permission_service.dart';
 import 'location_service.dart';
 
 class Contact {
@@ -29,18 +31,26 @@ class ContactService {
   Future<List<Contact>> getContacts() async {
     final prefs = await SharedPreferences.getInstance();
     final contactsJson = prefs.getStringList(_contactsKey) ?? [];
-    return contactsJson.map((c) => 
-      Contact.fromJson(Map<String, dynamic>.from(
-        Uri.splitQueryString(c).map((k, v) => MapEntry(k, v))
-      ))
-    ).toList();
+    List<Contact> contacts = [];
+    for (String c in contactsJson) {
+      try {
+        contacts.add(Contact.fromJson(jsonDecode(c)));
+      } catch (_) {
+        // Fallback for older URL-encoded data
+        try {
+          final decoded = Map<String, dynamic>.from(
+            Uri.splitQueryString(c).map((k, v) => MapEntry(k, v))
+          );
+          contacts.add(Contact.fromJson(decoded));
+        } catch (_) {}
+      }
+    }
+    return contacts;
   }
 
   Future<void> saveContacts(List<Contact> contacts) async {
     final prefs = await SharedPreferences.getInstance();
-    final contactsJson = contacts.map((c) => 
-      Uri(queryParameters: c.toJson()).query
-    ).toList();
+    final contactsJson = contacts.map((c) => jsonEncode(c.toJson())).toList();
     await prefs.setStringList(_contactsKey, contactsJson);
   }
 
@@ -64,37 +74,26 @@ class ContactService {
 class SmsService {
   final LocationService _locationService = LocationService();
   
-  Future<void> sendSosSms(List<Contact> contacts, String message) async {
-    final position = await _locationService.getCurrentPosition();
-    String locationLink = '';
-    
-    if (position != null) {
-      locationLink = _locationService.getGoogleMapsLink(
-        position.latitude, 
-        position.longitude,
-      );
-    } else {
-      final cached = await _locationService.getCachedPosition();
-      if (cached != null) {
-        locationLink = _locationService.getGoogleMapsLink(
-          cached.latitude,
-          cached.longitude,
-        );
-      }
-    }
-
-    final fullMessage = '$message$locationLink — Medusa';
-    
+  Future<void> sendSosSms(List<Contact> contacts, String fullMessage) async {
     for (final contact in contacts) {
       await _sendSms(contact.phone, fullMessage);
     }
   }
 
+  String _sanitizePhone(String phone) {
+    return phone.replaceAll(RegExp(r'[^\d+]'), '');
+  }
+
   Future<void> _sendSms(String phone, String message) async {
     const shieldChannel = MethodChannel('com.saheli.saheli/shield');
+    final permGranted = await PermissionService.checkAndRequestSms();
+    if (!permGranted) {
+      print('SMS permission denied — cannot send to $phone');
+      return;
+    }
     try {
       await shieldChannel.invokeMethod('sendSms', {
-        'phone': phone,
+        'phone': _sanitizePhone(phone),
         'message': message,
       });
       print('Native SMS sent to $phone: $message');

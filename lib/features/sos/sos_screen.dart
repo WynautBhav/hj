@@ -102,15 +102,14 @@ class _SosScreenState extends State<SosScreen> with TickerProviderStateMixin {
 
       if (contacts.isNotEmpty) {
         final locationService = LocationService();
-        final position = await locationService.getCurrentPosition();
-        String message = '🆘 I am in DANGER! My last location: ';
+        final position = await locationService.getCurrentPosition()
+            ?? await locationService.getCachedPosition(); // fallback to cache
 
-        if (position != null) {
-          message += locationService.getGoogleMapsLink(
-            position.latitude,
-            position.longitude,
-          );
-        }
+        final locationLink = position != null
+            ? locationService.getGoogleMapsLink(position.latitude, position.longitude)
+            : 'Location unavailable';
+
+        final message = '🆘 I am in DANGER! Location: $locationLink — Medusa';
 
         final smsService = SmsService();
         await smsService.sendSosSms(contacts, message);

@@ -18,7 +18,6 @@ class PermissionService {
     final permissions = {
       ph.Permission.locationWhenInUse,
       ph.Permission.locationAlways,
-      ph.Permission.sms,
       ph.Permission.camera,
       ph.Permission.microphone,
       ph.Permission.storage,

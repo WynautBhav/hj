@@ -18,6 +18,7 @@ import android.media.AudioManager
 import android.media.session.MediaSession
 import android.media.session.PlaybackState
 import androidx.core.content.ContextCompat
+import android.app.PendingIntent
 
 class MainActivity : FlutterActivity() {
     private val SCREEN_EVENT_CHANNEL = "com.saheli.saheli/screen_events"
@@ -189,6 +190,10 @@ class MainActivity : FlutterActivity() {
         }
     }
 
+    private fun sanitizePhone(phone: String): String {
+        return phone.trim().replace(Regex("[^+\\d]"), "")
+    }
+
     private fun sendSmsNatively(phone: String, message: String, result: MethodChannel.Result) {
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.SEND_SMS) != PackageManager.PERMISSION_GRANTED) {
             result.error("PERMISSION_DENIED", "SMS permission not granted", null)
@@ -203,11 +208,18 @@ class MainActivity : FlutterActivity() {
                 SmsManager.getDefault()
             }
             
+            val cleanPhone = sanitizePhone(phone)
+            val sentPI = PendingIntent.getBroadcast(
+                this, 0, Intent("SMS_SENT"), 
+                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+            )
+            
             val parts = smsManager.divideMessage(message)
             if (parts.size > 1) {
-                smsManager.sendMultipartTextMessage(phone, null, parts, null, null)
+                val sentList = ArrayList(parts.map { sentPI })
+                smsManager.sendMultipartTextMessage(cleanPhone, null, parts, sentList, null)
             } else {
-                smsManager.sendTextMessage(phone, null, message, null, null)
+                smsManager.sendTextMessage(cleanPhone, null, message, sentPI, null)
             }
             result.success(true)
         } catch (e: Exception) {
