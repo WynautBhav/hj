@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/services/dead_man_switch_service.dart';
+import '../../core/services/contact_service.dart';
+import '../../core/services/location_service.dart';
 
 class DeadManSwitchScreen extends StatefulWidget {
   const DeadManSwitchScreen({super.key});
@@ -10,7 +12,7 @@ class DeadManSwitchScreen extends StatefulWidget {
 }
 
 class _DeadManSwitchScreenState extends State<DeadManSwitchScreen> {
-  final DeadManSwitchService _service = DeadManSwitchService();
+  late final DeadManSwitchService _service;
   bool _isEnabled = false;
   int _intervalMinutes = 10;
   bool _isActive = false;
@@ -18,6 +20,38 @@ class _DeadManSwitchScreenState extends State<DeadManSwitchScreen> {
   @override
   void initState() {
     super.initState();
+    _service = DeadManSwitchService(
+      onTimeout: () async {
+        final contactService = ContactService();
+        final contacts = await contactService.getContacts();
+        if (contacts.isNotEmpty) {
+          final locationService = LocationService();
+          final position = await locationService.getCurrentPosition().timeout(
+            const Duration(seconds: 5),
+            onTimeout: () => null,
+          ) ?? await locationService.getCachedPosition();
+
+          final locationLink = position != null
+              ? locationService.getGoogleMapsLink(position.latitude, position.longitude)
+              : 'Location unavailable';
+
+          final message = '🆘 I am in DANGER! Location: $locationLink — Medusa';
+
+          final smsService = SmsService();
+          await smsService.sendSosSms(contacts, message);
+        }
+      },
+      onSafeCheckIn: () {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Check-in confirmed.'),
+              backgroundColor: AppColors.success,
+            ),
+          );
+        }
+      },
+    );
     _loadSettings();
   }
 

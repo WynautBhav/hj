@@ -30,8 +30,6 @@ class _PermissionRequestScreenState extends State<PermissionRequestScreen> {
       description: 'Send emergency alerts to contacts',
       permission: Permission.sms,
       color: Colors.blue,
-      requiresSpecialHandling: true,
-      specialMessage: 'On Android 4.4+, you must set this app as your default SMS app to send messages. Go to Settings > Apps > Default apps > SMS.',
     ),
     _PermissionItem(
       icon: Icons.camera_alt_rounded,

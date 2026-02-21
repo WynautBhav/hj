@@ -119,7 +119,7 @@ class _SosScreenState extends State<SosScreen> with TickerProviderStateMixin {
         _successCount = await smsService.sendSosSms(contacts, message);
       }
     } catch (e) {
-      // SMS sending failed
+      debugPrint('SOS SMS error: $e');
     }
 
     if (mounted) {

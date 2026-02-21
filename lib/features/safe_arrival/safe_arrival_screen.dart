@@ -53,14 +53,20 @@ class _SafeArrivalScreenState extends State<SafeArrivalScreen> {
     
     final contacts = await ContactService().getContacts();
     if (contacts.isNotEmpty) {
-      final position = await _locationService.getCurrentPosition();
-      if (position != null) {
-        final smsService = SmsService();
-        await smsService.sendLocationSms(
-          contacts,
-          'Safe Arrival monitoring started. I will confirm when I arrive safely.',
-        );
-      }
+      final position = await _locationService.getCurrentPosition().timeout(
+        const Duration(seconds: 5),
+        onTimeout: () => null,
+      ) ?? await _locationService.getCachedPosition();
+
+      final locationLink = position != null
+          ? _locationService.getGoogleMapsLink(position.latitude, position.longitude)
+          : 'Location unavailable';
+
+      final smsService = SmsService();
+      await smsService.sendLocationSms(
+        contacts,
+        'Safe Arrival monitoring started. I will confirm when I arrive safely. Location: $locationLink',
+      );
     }
     
     setState(() {
@@ -80,10 +86,19 @@ class _SafeArrivalScreenState extends State<SafeArrivalScreen> {
     
     final contacts = await ContactService().getContacts();
     if (contacts.isNotEmpty) {
+      final position = await _locationService.getCurrentPosition().timeout(
+        const Duration(seconds: 5),
+        onTimeout: () => null,
+      ) ?? await _locationService.getCachedPosition();
+
+      final locationLink = position != null
+          ? _locationService.getGoogleMapsLink(position.latitude, position.longitude)
+          : 'Location unavailable';
+
       final smsService = SmsService();
       await smsService.sendLocationSms(
         contacts,
-        'I have arrived safely! Thank you for checking in.',
+        'I have arrived safely! Thank you for checking in. Location: $locationLink',
       );
     }
     

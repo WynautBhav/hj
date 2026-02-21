@@ -1,8 +1,9 @@
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/services.dart';
-import 'permission_service.dart';
-import 'location_service.dart';
+import 'package:flutter/foundation.dart';
+import '../../core/services/permission_service.dart';
+import '../../core/services/location_service.dart';
 
 class Contact {
   final String name;
@@ -72,6 +73,10 @@ class ContactService {
 }
 
 class SmsService {
+  static final SmsService _instance = SmsService._internal();
+  factory SmsService() => _instance;
+  SmsService._internal();
+
   final LocationService _locationService = LocationService();
   bool _isSendingSos = false;
   
@@ -88,9 +93,13 @@ class SmsService {
 
       for (final contact in contacts) {
         final customMsg = prefs.getString('sos_message_${contact.phone}');
-        final finalMsg = (customMsg != null && customMsg.isNotEmpty) 
-            ? '$customMsg\n$defaultMessage' 
-            : defaultMessage;
+        String finalMsg = defaultMessage;
+        
+        if (customMsg != null && customMsg.isNotEmpty) {
+          final linkMatch = RegExp(r'https://[^\s]+').firstMatch(defaultMessage);
+          final link = linkMatch?.group(0) ?? '';
+          finalMsg = link.isNotEmpty ? '$customMsg\nLocation: $link' : customMsg;
+        }
 
         final success = await _sendSms(contact.phone, finalMsg);
         if (success) successCount++;
@@ -114,27 +123,12 @@ class SmsService {
       }).timeout(const Duration(seconds: 5));
       return result ?? false;
     } catch (e) {
-      print('Failed to send native SMS to $phone: $e');
+      debugPrint('Failed to send native SMS to $phone: $e');
       return false;
     }
   }
 
-  Future<void> sendLocationSms(List<Contact> contacts, String name) async {
-    final position = await _locationService.getCurrentPosition().timeout(
-      const Duration(seconds: 5),
-      onTimeout: () => null,
-    );
-    String locationLink = '';
-    
-    if (position != null) {
-      locationLink = _locationService.getGoogleMapsLink(
-        position.latitude, 
-        position.longitude,
-      );
-    }
-
-    final message = 'Medusa alert: $name\'s location: $locationLink';
-    
+  Future<void> sendLocationSms(List<Contact> contacts, String message) async {
     final permGranted = await PermissionService.checkAndRequestSms();
     if (!permGranted) return;
 

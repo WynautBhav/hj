@@ -71,15 +71,16 @@ class _VoiceSOSCountdownOverlayState extends State<VoiceSOSCountdownOverlay>
 
       if (contacts.isNotEmpty) {
         final locationService = LocationService();
-        final position = await locationService.getCurrentPosition();
-        String message = '🆘 I am in DANGER! My last location: ';
+        final position = await locationService.getCurrentPosition().timeout(
+          const Duration(seconds: 5),
+          onTimeout: () => null,
+        ) ?? await locationService.getCachedPosition();
 
-        if (position != null) {
-          message += locationService.getGoogleMapsLink(
-            position.latitude,
-            position.longitude,
-          );
-        }
+        final locationLink = position != null
+            ? locationService.getGoogleMapsLink(position.latitude, position.longitude)
+            : 'Location unavailable';
+
+        final message = '🆘 I am in DANGER! Location: $locationLink — Medusa';
 
         final smsService = SmsService();
         await smsService.sendSosSms(contacts, message);

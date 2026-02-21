@@ -22,6 +22,7 @@ class PermissionService {
       ph.Permission.microphone,
       ph.Permission.storage,
       ph.Permission.phone,
+      ph.Permission.sms,
       ph.Permission.bluetooth,
       ph.Permission.bluetoothConnect,
       ph.Permission.bluetoothScan,
