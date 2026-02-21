@@ -118,6 +118,8 @@ class _FakeCallScreenState extends State<FakeCallScreen>
       setState(() => _callDuration++);
     });
 
+    // Re-enforce immersive mode on accept (prevents navbar flash)
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
     // Dismiss full-screen intent notification (call accepted)
     FakeCallNotificationService.dismissCall();
 
@@ -143,6 +145,9 @@ class _FakeCallScreenState extends State<FakeCallScreen>
 
     // Reset foreground notification
     MedusaForegroundService.resetNotification();
+
+    // Restore system UI before popping
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
 
     if (mounted && Navigator.canPop(context)) {
       Navigator.of(context).pop();
