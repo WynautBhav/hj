@@ -174,10 +174,18 @@ class _MedusaAppState extends State<MedusaApp> with WidgetsBindingObserver {
     if (_servicesStarted) return;
     _servicesStarted = true;
 
+    // Foreground task service (heartbeat pings)
     try {
       await MedusaForegroundService.start();
     } catch (e) {
       debugPrint('Foreground service start failed: $e');
+    }
+
+    // Background isolate (runs ShakeService in separate isolate for when app is killed)
+    try {
+      await startBackgroundServiceIfPermitted();
+    } catch (e) {
+      debugPrint('Background service start failed: $e');
     }
 
     // Volume Down ×3 SOS

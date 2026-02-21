@@ -17,8 +17,8 @@ class ShakeService {
 
   static const Duration _debounceTime = Duration(milliseconds: 400);
 
-  // Loaded from prefs
-  double _thresholdG = 14.0;   // acceleration magnitude threshold (m/s²)
+  // Loaded from prefs — gravity-free thresholds (userAccelerometer reads 0 at rest)
+  double _thresholdG = 6.0;   // acceleration magnitude threshold (m/s²), gravity removed
   int _requiredShakes = 3;
   Duration _shakeWindow = const Duration(seconds: 3);
 
@@ -26,8 +26,8 @@ class ShakeService {
 
   // For backward compat — derived from threshold
   ShakeSensitivity get sensitivity {
-    if (_thresholdG >= 18.0) return ShakeSensitivity.low;
-    if (_thresholdG >= 12.0) return ShakeSensitivity.medium;
+    if (_thresholdG >= 10.0) return ShakeSensitivity.low;
+    if (_thresholdG >= 5.0) return ShakeSensitivity.medium;
     return ShakeSensitivity.high;
   }
 
@@ -37,11 +37,11 @@ class ShakeService {
     final prefs = await SharedPreferences.getInstance();
 
     // Read double sensitivity (0.5–5.0 from settings screen)
-    // Map to acceleration threshold: lower sensitivity value = higher threshold = harder to trigger
-    // sensitivity 0.5 → threshold 20 (hard to trigger)
-    // sensitivity 5.0 → threshold 8  (easy to trigger)
+    // Map to acceleration threshold (gravity-free):
+    //   sensitivity 0.5 → threshold 12 (hard to trigger, need violent shake)
+    //   sensitivity 5.0 → threshold 3  (easy to trigger, gentle shake)
     final sensitivityDouble = prefs.getDouble(_sensitivityKey) ?? 2.5;
-    _thresholdG = (20.0 - (sensitivityDouble - 0.5) * (12.0 / 4.5)).clamp(8.0, 20.0);
+    _thresholdG = (12.0 - (sensitivityDouble - 0.5) * (9.0 / 4.5)).clamp(3.0, 12.0);
 
     // Read shake count
     _requiredShakes = (prefs.getInt(_countKey) ?? 3).clamp(1, 10);
@@ -52,7 +52,6 @@ class ShakeService {
   }
 
   Future<void> setSensitivity(ShakeSensitivity sensitivity) async {
-    // Legacy method — convert enum to double and save
     final doubleValue = {
       ShakeSensitivity.low: 1.5,
       ShakeSensitivity.medium: 2.5,
@@ -60,7 +59,7 @@ class ShakeService {
     }[sensitivity]!;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setDouble(_sensitivityKey, doubleValue);
-    await init(); // Reload
+    await init();
   }
 
   void startListening() {
@@ -69,8 +68,11 @@ class ShakeService {
     _shakeTimestamps.clear();
 
     try {
-      _accelerometerSubscription = accelerometerEventStream(
-        samplingPeriod: const Duration(milliseconds: 50),
+      // userAccelerometerEventStream removes gravity automatically:
+      //   - At rest: ~0 m/s² (not ~9.8)
+      //   - SensorInterval enum (not Duration) for sensors_plus 5.x compat
+      _accelerometerSubscription = userAccelerometerEventStream(
+        samplingPeriod: SensorInterval.normalInterval,
       ).listen((event) {
         final magnitude = sqrt(
           event.x * event.x +

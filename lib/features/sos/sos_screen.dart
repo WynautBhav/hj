@@ -81,45 +81,76 @@ class _SosScreenState extends State<SosScreen> with TickerProviderStateMixin {
   }
 
   Future<void> _triggerSos() async {
-    final contactService = ContactService();
-    final contacts = await contactService.getContacts();
-    
-    if (contacts.isNotEmpty) {
-      final locationService = LocationService();
-      final position = await locationService.getCurrentPosition();
-      String message = '🆘 I am in DANGER! My last location: ';
-      
-      if (position != null) {
-        message += locationService.getGoogleMapsLink(
-          position.latitude,
-          position.longitude,
-        );
+    bool smsSent = false;
+
+    // Always start evidence collection — regardless of contacts
+    try {
+      FlashlightService().startSos();
+    } catch (e) {
+      // Flashlight may not be available
+    }
+    try {
+      AudioRecordingService().startRecording();
+    } catch (e) {
+      // Recording may fail
+    }
+
+    // Attempt SMS if contacts exist
+    try {
+      final contactService = ContactService();
+      final contacts = await contactService.getContacts();
+
+      if (contacts.isNotEmpty) {
+        final locationService = LocationService();
+        final position = await locationService.getCurrentPosition();
+        String message = '🆘 I am in DANGER! My last location: ';
+
+        if (position != null) {
+          message += locationService.getGoogleMapsLink(
+            position.latitude,
+            position.longitude,
+          );
+        }
+
+        final smsService = SmsService();
+        await smsService.sendSosSms(contacts, message);
+        smsSent = true;
       }
-      
-      final smsService = SmsService();
-      await smsService.sendSosSms(contacts, message);
+    } catch (e) {
+      // SMS sending failed
     }
 
     if (mounted) {
       showDialog(
         context: context,
         barrierDismissible: false,
-        builder: (context) => _SosSentDialog(
-          onOk: () async {
-            // STOP background actions
-            final prefs = await SharedPreferences.getInstance();
-            await prefs.setBool('bg_sos_actions_active', false);
-            await prefs.setBool('trigger_sos_now', false);
-            
-            FlashlightService().stopSos();
-            AudioRecordingService().stopRecording();
-
-            if (context.mounted) {
-              Navigator.pop(context);
-              Navigator.pop(context);
-            }
-          },
-        ),
+        builder: (context) => smsSent
+            ? _SosSentDialog(
+                onOk: () async {
+                  final prefs = await SharedPreferences.getInstance();
+                  await prefs.setBool('bg_sos_actions_active', false);
+                  await prefs.setBool('trigger_sos_now', false);
+                  FlashlightService().stopSos();
+                  AudioRecordingService().stopRecording();
+                  if (context.mounted) {
+                    Navigator.pop(context);
+                    Navigator.pop(context);
+                  }
+                },
+              )
+            : _SosNoContactsDialog(
+                onOk: () async {
+                  final prefs = await SharedPreferences.getInstance();
+                  await prefs.setBool('bg_sos_actions_active', false);
+                  await prefs.setBool('trigger_sos_now', false);
+                  FlashlightService().stopSos();
+                  AudioRecordingService().stopRecording();
+                  if (context.mounted) {
+                    Navigator.pop(context);
+                    Navigator.pop(context);
+                  }
+                },
+              ),
       );
     }
   }
@@ -471,6 +502,108 @@ class _SosSentDialog extends StatelessWidget {
                 onPressed: onOk,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF7C5FD6),
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: const Text(
+                  'OK',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            )
+            .animate()
+            .fadeIn(delay: 400.ms)
+            .slideY(begin: 0.2, end: 0),
+          ],
+        ),
+      ),
+    )
+    .animate()
+    .fadeIn(duration: 300.ms)
+    .scale(begin: const Offset(0.9, 0.9), end: const Offset(1, 1));
+  }
+}
+
+class _SosNoContactsDialog extends StatelessWidget {
+  final VoidCallback onOk;
+
+  const _SosNoContactsDialog({required this.onOk});
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      child: Container(
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          color: const Color(0xFF1A1A2E),
+          borderRadius: BorderRadius.circular(24),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 80,
+              height: 80,
+              decoration: BoxDecoration(
+                color: Colors.orange.withValues(alpha: 0.2),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.warning_amber_rounded,
+                color: Colors.orange,
+                size: 48,
+              ),
+            )
+            .animate()
+            .scale(
+              begin: const Offset(0.5, 0.5),
+              end: const Offset(1, 1),
+              curve: Curves.elasticOut,
+              duration: 600.ms,
+            ),
+
+            const SizedBox(height: 24),
+
+            const Text(
+              'No Contacts!',
+              style: TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
+            )
+            .animate()
+            .fadeIn(delay: 200.ms),
+
+            const SizedBox(height: 12),
+
+            Text(
+              'SOS was activated but no emergency contacts are saved. '
+              'Flashlight & audio recording started.\n\n'
+              'Go to Settings → Emergency Contacts to add contacts.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.white.withValues(alpha: 0.7),
+              ),
+            )
+            .animate()
+            .fadeIn(delay: 300.ms),
+
+            const SizedBox(height: 24),
+
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: onOk,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.orange,
                   padding: const EdgeInsets.symmetric(vertical: 16),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
