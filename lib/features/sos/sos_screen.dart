@@ -10,7 +10,8 @@ import '../../core/services/flashlight_service.dart';
 import '../../core/services/audio_recording_service.dart';
 
 class SosScreen extends StatefulWidget {
-  const SosScreen({super.key});
+  final bool autoTrigger;
+  const SosScreen({super.key, this.autoTrigger = false});
 
   @override
   State<SosScreen> createState() => _SosScreenState();
@@ -36,6 +37,13 @@ class _SosScreenState extends State<SosScreen> with TickerProviderStateMixin {
       vsync: this,
       duration: const Duration(milliseconds: 800),
     )..repeat(reverse: true);
+
+    // Auto-trigger: when fired from shake/voice/scream, skip manual press
+    if (widget.autoTrigger) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _startCountdown();
+      });
+    }
   }
 
   @override

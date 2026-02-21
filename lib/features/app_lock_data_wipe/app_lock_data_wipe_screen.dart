@@ -204,16 +204,29 @@ class _AppLockDataWipeScreenState extends State<AppLockDataWipeScreen> {
       // Never crash on wipe failure
     }
 
+    // Signal app root to reset to calculator state
+    try {
+      final prefs2 = await SharedPreferences.getInstance();
+      await prefs2.setBool('force_relock', true);
+    } catch (e) {
+      // prefs may already be cleared
+    }
+
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('All data has been wiped'),
+          content: Text('All data wiped. App reset.'),
           backgroundColor: AppColors.success,
+          duration: Duration(seconds: 2),
         ),
       );
+
+      await Future.delayed(const Duration(seconds: 2));
+
+      if (mounted) {
+        Navigator.of(context).popUntil((route) => route.isFirst);
+      }
     }
-    
-    await _loadSettings();
   }
 
   @override

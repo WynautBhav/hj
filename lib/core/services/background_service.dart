@@ -3,6 +3,7 @@ import 'dart:ui';
 import 'package:flutter_background_service/flutter_background_service.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'shake_service.dart';
 
 /// FIX #2 + #4: Background service initialization.
@@ -126,7 +127,14 @@ void onStart(ServiceInstance service) async {
   try {
     await shakeService.init();
     shakeService.onShakeDetected = () async {
+      // Write flag for polling fallback
       await prefs.setBool('trigger_sos_now', true);
+      // Actively ping main isolate to wake it immediately
+      try {
+        FlutterForegroundTask.sendDataToMain('trigger_sos:shake');
+      } catch (e) {
+        // Main isolate may not be alive — SharedPreferences flag is fallback
+      }
     };
     shakeService.startListening();
   } catch (e) {

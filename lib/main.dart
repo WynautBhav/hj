@@ -6,6 +6,9 @@ import 'core/constants/app_colors.dart';
 import 'core/services/shake_service.dart';
 import 'core/services/power_button_service.dart';
 import 'core/services/permission_service.dart';
+import 'core/services/location_service.dart';
+import 'core/services/contact_service.dart';
+import 'core/services/guardian_service.dart';
 import 'features/calculator_disguise/calculator_screen.dart';
 import 'features/home/home_screen.dart';
 import 'features/sos/sos_screen.dart';
@@ -25,33 +28,28 @@ import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // FIX #2 + #8: Initialize background service configuration ONLY.
-  // This just creates the notification channel and configures the service.
-  // The actual service is NOT started here (autoStart: false).
-  // Wrapped in try-catch so init failure never kills the app.
   try {
     await initializeBackgroundService();
   } catch (e) {
     debugPrint('Background service init failed: $e');
   }
 
-  // Initialize foreground task (just configures — does NOT start service yet)
   try {
     await MedusaForegroundService.init();
   } catch (e) {
     debugPrint('Foreground task init failed: $e');
   }
-  
+
   SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
     DeviceOrientation.portraitDown,
   ]);
-  
+
   SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
     statusBarColor: Colors.transparent,
     statusBarIconBrightness: Brightness.dark,
   ));
-  
+
   runApp(const MedusaApp());
 }
 
@@ -71,7 +69,7 @@ class _MedusaAppState extends State<MedusaApp> with WidgetsBindingObserver {
   late PowerButtonService _powerButtonService;
   Timer? _bgCheckTimer;
   bool _servicesStarted = false;
-  DateTime? _lastSosTrigger; // Debounce: no double-trigger within 10s
+  DateTime? _lastSosTrigger;
   ScreamDetectionService? _screamService;
 
   @override
@@ -84,29 +82,42 @@ class _MedusaAppState extends State<MedusaApp> with WidgetsBindingObserver {
   }
 
   void _startBackgroundListener() {
-    // Poll SharedPreferences for SOS/fake-call triggers from background (1s).
     _bgCheckTimer = Timer.periodic(const Duration(seconds: 1), (timer) async {
       try {
         final prefs = await SharedPreferences.getInstance();
-        await prefs.reload(); // Ensure fresh data from background isolate
+        await prefs.reload();
         if (prefs.getBool('trigger_sos_now') == true) {
           await prefs.setBool('trigger_sos_now', false);
-          _triggerSos();
+          _triggerSos('shake');
         }
         if (prefs.getBool('trigger_fake_call_now') == true) {
           await prefs.setBool('trigger_fake_call_now', false);
           _triggerFakeCall();
+        }
+        // Fix 3A: Watch for force_relock signal from data wipe
+        if (prefs.getBool('force_relock') == true) {
+          await prefs.setBool('force_relock', false);
+          if (mounted) {
+            setState(() {
+              _isUnlocked = false;
+              _servicesStarted = false;
+            });
+          }
         }
       } catch (e) {
         // SharedPreferences can throw on concurrent access
       }
     });
 
-    // FIX #2: Listen for foreground task heartbeat to re-arm voice SOS
+    // Listen for foreground task heartbeat + trigger_sos pings
     try {
       FlutterForegroundTask.addTaskDataCallback((data) {
-        if (data == 'voice_sos_check') {
+        final dataStr = data.toString();
+        if (dataStr == 'voice_sos_check') {
           _checkAndRearmVoiceSos();
+        } else if (dataStr.startsWith('trigger_sos:')) {
+          final type = dataStr.split(':').length > 1 ? dataStr.split(':')[1] : 'shake';
+          _triggerSos(type);
         }
       });
     } catch (e) {
@@ -114,14 +125,12 @@ class _MedusaAppState extends State<MedusaApp> with WidgetsBindingObserver {
     }
   }
 
-  /// FIX #2: Called by foreground task heartbeat. Re-arms voice SOS
-  /// if it was armed but the listener died.
   void _checkAndRearmVoiceSos() async {
     try {
       final voiceSos = VoiceSOSService();
       if (voiceSos.isArmed && !voiceSos.isListening) {
         await voiceSos.arm();
-        voiceSos.onPhraseDetected = (_) => _triggerSos();
+        voiceSos.onPhraseDetected = (_) => _triggerSos('voice');
       }
     } catch (e) {
       // Never crash on heartbeat callback
@@ -140,29 +149,17 @@ class _MedusaAppState extends State<MedusaApp> with WidgetsBindingObserver {
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      // LIFECYCLE SAFETY: Only restart sensor listeners on resume.
-      // Do NOT start foreground service here — it causes
-      // ForegroundServiceStartNotAllowedException on Android 12+
-      // when returning from system settings screens.
       _safeResumeListeners();
     }
   }
 
   Future<void> _initServices() async {
-    // FIX #8: Wrap service init in try-catch — accelerometer may not be available
-    try {
-      _shakeService = ShakeService();
-      await _shakeService.init();
-      _shakeService.onShakeDetected = _triggerSos;
-      _shakeService.startListening();
-    } catch (e) {
-      _shakeService = ShakeService(); // Fallback: create but don't listen
-      debugPrint('Shake service init failed: $e');
-    }
+    // Initialize shake service reference (startListening deferred to _startProtectionServices)
+    _shakeService = ShakeService();
 
     try {
       _powerButtonService = PowerButtonService();
-      _powerButtonService.onTriplePressDetected = _triggerSos;
+      _powerButtonService.onTriplePressDetected = () => _triggerSos('power');
       final isEnabled = await _powerButtonService.isEnabled();
       if (isEnabled) {
         _powerButtonService.startListening();
@@ -171,43 +168,44 @@ class _MedusaAppState extends State<MedusaApp> with WidgetsBindingObserver {
       _powerButtonService = PowerButtonService();
       debugPrint('Power button service init failed: $e');
     }
-
-    // LIFECYCLE SAFETY: Do NOT start foreground service in initState().
-    // It's started later in _onUnlocked() after user reaches home screen.
-    // Starting it here would request permissions (opening settings) and then
-    // try to start FG service from background state on return — guaranteed crash.
   }
 
-  /// Start foreground service + volume SOS ONLY after user reaches home screen.
-  /// This is the ONLY place foreground service is started — user-triggered.
   Future<void> _startProtectionServices() async {
     if (_servicesStarted) return;
     _servicesStarted = true;
 
-    // Start foreground service (deferred to be safe)
     try {
       await MedusaForegroundService.start();
     } catch (e) {
       debugPrint('Foreground service start failed: $e');
     }
 
-    // Start Volume Down ×3 SOS (MediaSession-backed)
+    // Volume Down ×3 SOS
     try {
       final volumeEnabled = await VolumeSosService.isEnabled();
       if (volumeEnabled) {
-        VolumeSosService.onTriplePressDetected = _triggerSos;
+        VolumeSosService.onTriplePressDetected = () => _triggerSos('volume');
         await VolumeSosService.start();
       }
     } catch (e) {
       debugPrint('Volume SOS init failed: $e');
     }
 
-    // Start scream detection if enabled
+    // Shake: arm after unlock
+    try {
+      await _shakeService.init();
+      _shakeService.onShakeDetected = () => _triggerSos('shake');
+      _shakeService.startListening();
+    } catch (e) {
+      debugPrint('Shake arm failed: $e');
+    }
+
+    // Scream detection
     try {
       _screamService = ScreamDetectionService();
       final screamEnabled = await _screamService!.isEnabled();
       if (screamEnabled) {
-        _screamService!.onScreamDetected = _triggerSos;
+        _screamService!.onScreamDetected = () => _triggerSos('scream');
         await _screamService!.startListening();
       }
     } catch (e) {
@@ -215,11 +213,12 @@ class _MedusaAppState extends State<MedusaApp> with WidgetsBindingObserver {
     }
   }
 
-  /// LIFECYCLE SAFETY: Only restart sensor listeners — never start FG service.
-  /// Called on AppLifecycleState.resumed (returning from settings, etc.)
   Future<void> _safeResumeListeners() async {
     try {
-      _shakeService.startListening();
+      if (_servicesStarted) {
+        _shakeService.onShakeDetected = () => _triggerSos('shake');
+        _shakeService.startListening();
+      }
       final isEnabled = await _powerButtonService.isEnabled();
       if (isEnabled) {
         _powerButtonService.startListening();
@@ -228,24 +227,24 @@ class _MedusaAppState extends State<MedusaApp> with WidgetsBindingObserver {
       // Never crash on resume
     }
 
-    // Voice SOS: auto-resume if it was armed before app went to background
+    // Voice SOS re-arm
     try {
       final voiceSos = VoiceSOSService();
       final wasArmed = await voiceSos.isServiceArmed();
       if (wasArmed && !voiceSos.isListening) {
         await voiceSos.arm();
-        voiceSos.onPhraseDetected = (_) => _triggerSos();
+        voiceSos.onPhraseDetected = (_) => _triggerSos('voice');
       }
     } catch (e) {
       debugPrint('Voice SOS resume failed: $e');
     }
 
-    // Scream detection: re-arm if enabled
+    // Scream detection re-arm
     try {
-      if (_screamService != null) {
+      if (_screamService != null && _servicesStarted) {
         final screamEnabled = await _screamService!.isEnabled();
         if (screamEnabled && !_screamService!.isActive) {
-          _screamService!.onScreamDetected = _triggerSos;
+          _screamService!.onScreamDetected = () => _triggerSos('scream');
           await _screamService!.startListening();
         }
       }
@@ -259,7 +258,7 @@ class _MedusaAppState extends State<MedusaApp> with WidgetsBindingObserver {
     final onboardingComplete = prefs.getBool('onboarding_complete') ?? false;
     final name = prefs.getString('user_name') ?? '';
     final permissionsAsked = prefs.getBool('permissions_asked') ?? false;
-    
+
     setState(() {
       _showOnboarding = !onboardingComplete;
       _showPermissions = onboardingComplete && !permissionsAsked;
@@ -267,8 +266,9 @@ class _MedusaAppState extends State<MedusaApp> with WidgetsBindingObserver {
     });
   }
 
-  void _triggerSos() {
+  void _triggerSos([String triggerType = 'manual']) {
     if (!mounted) return;
+    if (!_isUnlocked) return; // Don't fire on calculator screen
 
     // Debounce: prevent double-trigger within 10 seconds
     final now = DateTime.now();
@@ -278,26 +278,64 @@ class _MedusaAppState extends State<MedusaApp> with WidgetsBindingObserver {
     }
     _lastSosTrigger = now;
 
-    // Record SOS event in history
-    try {
-      SosHistoryService().recordSos(
-        triggerType: 'auto',
-        contactsNotified: 0,
-      );
-    } catch (e) {
-      // Never crash on history recording
-    }
+    // Record SOS event in history with correct trigger type
+    _recordSosHistory(triggerType);
 
     Navigator.push(
       context,
       PageRouteBuilder(
-        pageBuilder: (_, __, ___) => const SosScreen(),
+        pageBuilder: (_, __, ___) => SosScreen(
+          autoTrigger: triggerType != 'manual',
+        ),
         transitionsBuilder: (_, animation, __, child) {
           return FadeTransition(opacity: animation, child: child);
         },
         transitionDuration: const Duration(milliseconds: 300),
       ),
     );
+
+    // Notify guardian device via BLE if connected
+    _notifyGuardian();
+  }
+
+  /// Records SOS to SQLite history asynchronously — never blocks the SOS trigger.
+  void _recordSosHistory(String triggerType) {
+    Future(() async {
+      try {
+        final locationService = LocationService();
+        final contactService = ContactService();
+        final pos = await locationService.getCurrentPosition();
+        final contacts = await contactService.getContacts();
+        await SosHistoryService().recordSos(
+          triggerType: triggerType,
+          latitude: pos?.latitude,
+          longitude: pos?.longitude,
+          contactsNotified: contacts.length,
+        );
+      } catch (e) {
+        // Never crash on history recording
+      }
+    });
+  }
+
+  /// Notify guardian device via BLE if connected.
+  void _notifyGuardian() {
+    Future(() async {
+      try {
+        final guardianService = GuardianService();
+        if (!await guardianService.isEnabled()) return;
+        if (!guardianService.isConnected) return;
+
+        final locationService = LocationService();
+        final pos = await locationService.getCurrentPosition();
+        final link = pos != null
+            ? 'https://maps.google.com/?q=${pos.latitude},${pos.longitude}'
+            : 'Location unavailable';
+        await guardianService.sendSosAlert(locationLink: link);
+      } catch (e) {
+        // Never crash on guardian notify failure
+      }
+    });
   }
 
   void _triggerFakeCall() {
@@ -312,21 +350,14 @@ class _MedusaAppState extends State<MedusaApp> with WidgetsBindingObserver {
   void _onUnlocked() {
     setState(() => _isUnlocked = true);
 
-    // LIFECYCLE SAFETY: Start foreground service ONLY here — after user
-    // has passed calculator disguise and reached home screen.
-    // This guarantees the app is in foreground state when service starts.
     _startProtectionServices();
 
-    // Load SOS state manager so UI can reflect armed status
     SosStateManager().loadState();
     SosStateManager().setServiceRunning(true);
 
-    // Show battery optimization dialog once after first unlock
     _showBatteryOptimizationHint();
   }
 
-  /// One-time, non-blocking battery optimization suggestion.
-  /// Shown only once — dismissed permanently via SharedPreferences.
   Future<void> _showBatteryOptimizationHint() async {
     final prefs = await SharedPreferences.getInstance();
     if (prefs.getBool('battery_opt_dismissed') == true) return;
@@ -334,7 +365,6 @@ class _MedusaAppState extends State<MedusaApp> with WidgetsBindingObserver {
     final isIgnoring = await Permission.ignoreBatteryOptimizations.isGranted;
     if (isIgnoring) return;
 
-    // Small delay so home screen renders first
     await Future.delayed(const Duration(seconds: 2));
     if (!mounted) return;
 
@@ -379,7 +409,7 @@ class _MedusaAppState extends State<MedusaApp> with WidgetsBindingObserver {
   void _onOnboardingComplete() async {
     final prefs = await SharedPreferences.getInstance();
     final name = prefs.getString('user_name') ?? '';
-    
+
     setState(() {
       _showOnboarding = false;
       _showPermissions = true;

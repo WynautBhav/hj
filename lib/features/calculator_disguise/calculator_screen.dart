@@ -1,9 +1,13 @@
+import 'dart:io';
 import 'dart:math' show pi, sin;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:sqflite/sqflite.dart';
+import 'package:path/path.dart' as p;
+import 'package:path_provider/path_provider.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/services/wrong_pin_capture_service.dart';
 
@@ -19,9 +23,9 @@ class CalculatorDisguiseScreen extends StatefulWidget {
 class _CalculatorDisguiseScreenState extends State<CalculatorDisguiseScreen> with SingleTickerProviderStateMixin {
   String _display = '';
   String _inputSequence = '';
-  static const String _unlockCode = '2580=';
-  static const String _pinKey = 'unlock_pin';
-  static const String _wrongAttemptsKey = 'wrong_attempts';
+  String? _storedPin;
+  static const String _pinKey = 'calculator_pin';
+  static const String _wrongAttemptsKey = 'wrong_pin_attempts';
   final FlutterSecureStorage _secureStorage = const FlutterSecureStorage();
   final WrongPinCaptureService _captureService = WrongPinCaptureService();
   
@@ -37,9 +41,8 @@ class _CalculatorDisguiseScreenState extends State<CalculatorDisguiseScreen> wit
       duration: const Duration(milliseconds: 500),
       vsync: this,
     );
-    _shakeAnimation = Tween<double>(begin: 0, end: 24)
-        .chain(CurveTween(curve: Curves.elasticIn))
-        .animate(_shakeController);
+    _shakeAnimation = Tween<double>(begin: 0, end: 1)
+        .animate(CurvedAnimation(parent: _shakeController, curve: Curves.elasticIn));
   }
 
   @override
@@ -50,9 +53,10 @@ class _CalculatorDisguiseScreenState extends State<CalculatorDisguiseScreen> wit
   }
 
   Future<void> _initializePin() async {
-    final storedPin = await _secureStorage.read(key: _pinKey);
-    if (storedPin == null) {
-      await _secureStorage.write(key: _pinKey, value: _unlockCode);
+    _storedPin = await _secureStorage.read(key: _pinKey);
+    if (_storedPin == null) {
+      _storedPin = '1234=';
+      await _secureStorage.write(key: _pinKey, value: _storedPin);
     }
   }
 
@@ -73,10 +77,9 @@ class _CalculatorDisguiseScreenState extends State<CalculatorDisguiseScreen> wit
   }
 
   Future<void> _checkUnlock() async {
-    final storedPin = await _secureStorage.read(key: _pinKey);
-    
-    if (_inputSequence == storedPin) {
+    if (_inputSequence == _storedPin) {
       HapticFeedback.heavyImpact();
+      _resetWrongAttempts();
       widget.onUnlocked();
     } else {
       await _captureService.capturePhoto();
@@ -98,6 +101,11 @@ class _CalculatorDisguiseScreenState extends State<CalculatorDisguiseScreen> wit
     _display = '';
   }
 
+  Future<void> _resetWrongAttempts() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt(_wrongAttemptsKey, 0);
+  }
+
   Future<void> _incrementWrongAttempts() async {
     final prefs = await SharedPreferences.getInstance();
     final attempts = prefs.getInt(_wrongAttemptsKey) ?? 0;
@@ -109,10 +117,33 @@ class _CalculatorDisguiseScreenState extends State<CalculatorDisguiseScreen> wit
   }
 
   Future<void> _wipeData() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.clear();
-    await _secureStorage.deleteAll();
-    await _initializePin();
+    try {
+      // 1. Clear SharedPreferences
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.clear();
+
+      // 2. Clear secure storage
+      await _secureStorage.deleteAll();
+
+      // 3. Delete SQLite database
+      try {
+        final dbPath = p.join(await getDatabasesPath(), 'sos_history.db');
+        final dbFile = File(dbPath);
+        if (await dbFile.exists()) await dbFile.delete();
+      } catch (e) { /* DB may not exist */ }
+
+      // 4. Delete evidence locker
+      try {
+        final appDir = await getApplicationDocumentsDirectory();
+        final lockerDir = Directory('${appDir.path}/evidence_locker');
+        if (await lockerDir.exists()) await lockerDir.delete(recursive: true);
+      } catch (e) { /* May not exist */ }
+
+      // 5. Re-initialize (creates fresh PIN)
+      await _initializePin();
+    } catch (e) {
+      // Never crash on wipe
+    }
   }
 
   @override
