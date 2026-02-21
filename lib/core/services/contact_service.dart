@@ -73,38 +73,57 @@ class ContactService {
 
 class SmsService {
   final LocationService _locationService = LocationService();
+  bool _isSendingSos = false;
   
-  Future<void> sendSosSms(List<Contact> contacts, String fullMessage) async {
-    for (final contact in contacts) {
-      await _sendSms(contact.phone, fullMessage);
+  Future<int> sendSosSms(List<Contact> contacts, String defaultMessage) async {
+    if (_isSendingSos) return 0;
+    _isSendingSos = true;
+    int successCount = 0;
+
+    try {
+      final permGranted = await PermissionService.checkAndRequestSms();
+      if (!permGranted) return 0;
+
+      final prefs = await SharedPreferences.getInstance();
+
+      for (final contact in contacts) {
+        final customMsg = prefs.getString('sos_message_${contact.phone}');
+        final finalMsg = (customMsg != null && customMsg.isNotEmpty) 
+            ? '$customMsg\n$defaultMessage' 
+            : defaultMessage;
+
+        final success = await _sendSms(contact.phone, finalMsg);
+        if (success) successCount++;
+      }
+    } finally {
+      _isSendingSos = false;
     }
+    return successCount;
   }
 
   String _sanitizePhone(String phone) {
     return phone.replaceAll(RegExp(r'[^\d+]'), '');
   }
 
-  Future<void> _sendSms(String phone, String message) async {
+  Future<bool> _sendSms(String phone, String message) async {
     const shieldChannel = MethodChannel('com.saheli.saheli/shield');
-    final permGranted = await PermissionService.checkAndRequestSms();
-    if (!permGranted) {
-      print('SMS permission denied — cannot send to $phone');
-      return;
-    }
     try {
-      await shieldChannel.invokeMethod('sendSms', {
+      final result = await shieldChannel.invokeMethod<bool>('sendSms', {
         'phone': _sanitizePhone(phone),
         'message': message,
-      });
-      print('Native SMS sent to $phone: $message');
+      }).timeout(const Duration(seconds: 5));
+      return result ?? false;
     } catch (e) {
       print('Failed to send native SMS to $phone: $e');
-      // Fallback or log error
+      return false;
     }
   }
 
   Future<void> sendLocationSms(List<Contact> contacts, String name) async {
-    final position = await _locationService.getCurrentPosition();
+    final position = await _locationService.getCurrentPosition().timeout(
+      const Duration(seconds: 5),
+      onTimeout: () => null,
+    );
     String locationLink = '';
     
     if (position != null) {
@@ -116,6 +135,9 @@ class SmsService {
 
     final message = 'Medusa alert: $name\'s location: $locationLink';
     
+    final permGranted = await PermissionService.checkAndRequestSms();
+    if (!permGranted) return;
+
     for (final contact in contacts) {
       await _sendSms(contact.phone, message);
     }

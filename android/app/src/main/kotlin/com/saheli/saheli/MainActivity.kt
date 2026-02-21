@@ -19,6 +19,11 @@ import android.media.session.MediaSession
 import android.media.session.PlaybackState
 import androidx.core.content.ContextCompat
 import android.app.PendingIntent
+import android.telephony.TelephonyManager
+import android.provider.Settings
+import android.content.BroadcastReceiver
+import android.content.IntentFilter
+import android.app.Activity
 
 class MainActivity : FlutterActivity() {
     private val SCREEN_EVENT_CHANNEL = "com.saheli.saheli/screen_events"
@@ -190,13 +195,35 @@ class MainActivity : FlutterActivity() {
         }
     }
 
+    private var smsRequestCodeCounter = 0
+
+    private fun isAirplaneModeOn(): Boolean {
+        return Settings.Global.getInt(contentResolver, Settings.Global.AIRPLANE_MODE_ON, 0) != 0
+    }
+
+    private fun isSimActive(): Boolean {
+        val telephonyManager = getSystemService(Context.TELEPHONY_SERVICE) as TelephonyManager
+        return telephonyManager.simState == TelephonyManager.SIM_STATE_READY
+    }
+
     private fun sanitizePhone(phone: String): String {
         return phone.trim().replace(Regex("[^+\\d]"), "")
     }
 
     private fun sendSmsNatively(phone: String, message: String, result: MethodChannel.Result) {
+        if (isAirplaneModeOn()) {
+            android.util.Log.e("MedusaSMS", "Airplane mode is ON")
+            result.success(false)
+            return
+        }
+        if (!isSimActive()) {
+            android.util.Log.e("MedusaSMS", "SIM is not ready")
+            result.success(false)
+            return
+        }
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.SEND_SMS) != PackageManager.PERMISSION_GRANTED) {
-            result.error("PERMISSION_DENIED", "SMS permission not granted", null)
+            android.util.Log.e("MedusaSMS", "Permission denied")
+            result.success(false)
             return
         }
 
@@ -209,21 +236,54 @@ class MainActivity : FlutterActivity() {
             }
             
             val cleanPhone = sanitizePhone(phone)
-            val sentPI = PendingIntent.getBroadcast(
-                this, 0, Intent("SMS_SENT"), 
-                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
-            )
-            
             val parts = smsManager.divideMessage(message)
-            if (parts.size > 1) {
-                val sentList = ArrayList(parts.map { sentPI })
-                smsManager.sendMultipartTextMessage(cleanPhone, null, parts, sentList, null)
-            } else {
-                smsManager.sendTextMessage(cleanPhone, null, message, sentPI, null)
+            val totalParts = parts.size
+            
+            val action = "com.saheli.saheli.SMS_SENT_${smsRequestCodeCounter++}"
+            var partsCompleted = 0
+            var anySuccess = false
+
+            val receiver = object : BroadcastReceiver() {
+                override fun onReceive(context: Context?, intent: Intent?) {
+                    partsCompleted++
+                    if (resultCode == Activity.RESULT_OK) {
+                        anySuccess = true
+                    }
+                    
+                    if (partsCompleted == totalParts) {
+                        try {
+                            context?.unregisterReceiver(this)
+                        } catch (e: Exception) {}
+                        result.success(anySuccess)
+                    }
+                }
             }
-            result.success(true)
+            
+            val intentFilter = IntentFilter(action)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                applicationContext.registerReceiver(receiver, intentFilter, Context.RECEIVER_NOT_EXPORTED)
+            } else {
+                applicationContext.registerReceiver(receiver, intentFilter)
+            }
+            
+            val sentIntents = ArrayList<PendingIntent>()
+            for (i in 0 until totalParts) {
+                val intent = Intent(action)
+                val pi = PendingIntent.getBroadcast(
+                    applicationContext, i, intent, 
+                    PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+                )
+                sentIntents.add(pi)
+            }
+            
+            if (totalParts > 1) {
+                smsManager.sendMultipartTextMessage(cleanPhone, null, parts, sentIntents, null)
+            } else {
+                smsManager.sendTextMessage(cleanPhone, null, message, sentIntents[0], null)
+            }
         } catch (e: Exception) {
-            result.error("SMS_ERR", e.message, null)
+            android.util.Log.e("MedusaSMS", "SMS send failed: ${e.message}")
+            result.success(false)
         }
     }
 

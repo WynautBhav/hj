@@ -81,7 +81,8 @@ class _SosScreenState extends State<SosScreen> with TickerProviderStateMixin {
   }
 
   Future<void> _triggerSos() async {
-    bool smsSent = false;
+    int _successCount = 0;
+    int _totalContacts = 0;
 
     // Always start evidence collection — regardless of contacts
     try {
@@ -99,11 +100,14 @@ class _SosScreenState extends State<SosScreen> with TickerProviderStateMixin {
     try {
       final contactService = ContactService();
       final contacts = await contactService.getContacts();
+      _totalContacts = contacts.length;
 
       if (contacts.isNotEmpty) {
         final locationService = LocationService();
-        final position = await locationService.getCurrentPosition()
-            ?? await locationService.getCachedPosition(); // fallback to cache
+        final position = await locationService.getCurrentPosition().timeout(
+          const Duration(seconds: 5),
+          onTimeout: () => null,
+        ) ?? await locationService.getCachedPosition();
 
         final locationLink = position != null
             ? locationService.getGoogleMapsLink(position.latitude, position.longitude)
@@ -112,8 +116,7 @@ class _SosScreenState extends State<SosScreen> with TickerProviderStateMixin {
         final message = '🆘 I am in DANGER! Location: $locationLink — Medusa';
 
         final smsService = SmsService();
-        await smsService.sendSosSms(contacts, message);
-        smsSent = true;
+        _successCount = await smsService.sendSosSms(contacts, message);
       }
     } catch (e) {
       // SMS sending failed
@@ -123,33 +126,29 @@ class _SosScreenState extends State<SosScreen> with TickerProviderStateMixin {
       showDialog(
         context: context,
         barrierDismissible: false,
-        builder: (context) => smsSent
-            ? _SosSentDialog(
-                onOk: () async {
-                  final prefs = await SharedPreferences.getInstance();
-                  await prefs.setBool('bg_sos_actions_active', false);
-                  await prefs.setBool('trigger_sos_now', false);
-                  FlashlightService().stopSos();
-                  AudioRecordingService().stopRecording();
-                  if (context.mounted) {
-                    Navigator.pop(context);
-                    Navigator.pop(context);
-                  }
-                },
-              )
-            : _SosNoContactsDialog(
-                onOk: () async {
-                  final prefs = await SharedPreferences.getInstance();
-                  await prefs.setBool('bg_sos_actions_active', false);
-                  await prefs.setBool('trigger_sos_now', false);
-                  FlashlightService().stopSos();
-                  AudioRecordingService().stopRecording();
-                  if (context.mounted) {
-                    Navigator.pop(context);
-                    Navigator.pop(context);
-                  }
-                },
-              ),
+        builder: (context) {
+          final resetAction = () async {
+            final prefs = await SharedPreferences.getInstance();
+            await prefs.setBool('bg_sos_actions_active', false);
+            await prefs.setBool('trigger_sos_now', false);
+            FlashlightService().stopSos();
+            AudioRecordingService().stopRecording();
+            if (context.mounted) {
+              Navigator.pop(context);
+              Navigator.pop(context);
+            }
+          };
+
+          if (_totalContacts == 0) {
+            return _SosNoContactsDialog(onOk: resetAction);
+          } else if (_successCount == _totalContacts && _totalContacts > 0) {
+            return _SosSentDialog(onOk: resetAction, partial: false);
+          } else if (_successCount > 0) {
+            return _SosSentDialog(onOk: resetAction, partial: true);
+          } else {
+            return _SosFailureDialog(onOk: resetAction);
+          }
+        },
       );
     }
   }
@@ -430,8 +429,9 @@ class _SosScreenState extends State<SosScreen> with TickerProviderStateMixin {
 
 class _SosSentDialog extends StatelessWidget {
   final VoidCallback onOk;
+  final bool partial;
 
-  const _SosSentDialog({required this.onOk});
+  const _SosSentDialog({required this.onOk, this.partial = false});
 
   @override
   Widget build(BuildContext context) {
@@ -450,12 +450,12 @@ class _SosSentDialog extends StatelessWidget {
               width: 80,
               height: 80,
               decoration: BoxDecoration(
-                color: Colors.green.withValues(alpha: 0.2),
+                color: partial ? Colors.orange.withValues(alpha: 0.2) : Colors.green.withValues(alpha: 0.2),
                 shape: BoxShape.circle,
               ),
-              child: const Icon(
-                Icons.check_rounded,
-                color: Colors.green,
+              child: Icon(
+                partial ? Icons.warning_rounded : Icons.check_rounded,
+                color: partial ? Colors.orange : Colors.green,
                 size: 48,
               ),
             )
@@ -469,9 +469,9 @@ class _SosSentDialog extends StatelessWidget {
             
             const SizedBox(height: 24),
             
-            const Text(
-              'SOS Sent!',
-              style: TextStyle(
+            Text(
+              partial ? 'Partial Success' : 'SOS Sent!',
+              style: const TextStyle(
                 fontSize: 24,
                 fontWeight: FontWeight.bold,
                 color: Colors.white,
@@ -483,7 +483,9 @@ class _SosSentDialog extends StatelessWidget {
             const SizedBox(height: 12),
             
             Text(
-              'Emergency alert has been sent to your trusted contacts with your live location.',
+              partial 
+                ? 'Some SMS alerts failed to send. Check network signal for fully reliable delivery.' 
+                : 'Emergency alert has been sent to your trusted contacts with your live location.',
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 14,
@@ -500,7 +502,7 @@ class _SosSentDialog extends StatelessWidget {
               child: ElevatedButton(
                 onPressed: onOk,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF7C5FD6),
+                  backgroundColor: partial ? Colors.orange : const Color(0xFF7C5FD6),
                   padding: const EdgeInsets.symmetric(vertical: 16),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
@@ -603,6 +605,106 @@ class _SosNoContactsDialog extends StatelessWidget {
                 onPressed: onOk,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.orange,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: const Text(
+                  'OK',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            )
+            .animate()
+            .fadeIn(delay: 400.ms)
+            .slideY(begin: 0.2, end: 0),
+          ],
+        ),
+      ),
+    )
+    .animate()
+    .fadeIn(duration: 300.ms)
+    .scale(begin: const Offset(0.9, 0.9), end: const Offset(1, 1));
+  }
+}
+
+class _SosFailureDialog extends StatelessWidget {
+  final VoidCallback onOk;
+
+  const _SosFailureDialog({required this.onOk});
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      child: Container(
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          color: const Color(0xFF1A1A2E),
+          borderRadius: BorderRadius.circular(24),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 80,
+              height: 80,
+              decoration: BoxDecoration(
+                color: Colors.red.withValues(alpha: 0.2),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.error_outline_rounded,
+                color: Colors.red,
+                size: 48,
+              ),
+            )
+            .animate()
+            .scale(
+              begin: const Offset(0.5, 0.5),
+              end: const Offset(1, 1),
+              curve: Curves.elasticOut,
+              duration: 600.ms,
+            ),
+            
+            const SizedBox(height: 24),
+            
+            const Text(
+              'SMS Failed!',
+              style: TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
+            )
+            .animate()
+            .fadeIn(delay: 200.ms),
+            
+            const SizedBox(height: 12),
+            
+            Text(
+              'Could not send SMS to any emergency contacts. Check your SIM card, network signal, and Airplane Mode.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.white.withValues(alpha: 0.7),
+              ),
+            )
+            .animate()
+            .fadeIn(delay: 300.ms),
+            
+            const SizedBox(height: 24),
+            
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: onOk,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.red,
                   padding: const EdgeInsets.symmetric(vertical: 16),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
