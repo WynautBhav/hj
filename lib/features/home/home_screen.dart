@@ -336,61 +336,86 @@ class _HomeContentState extends State<HomeContent> with SingleTickerProviderStat
   }
 
   Widget _buildHeader(String name) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        Text(
-          // FIX #6: Must CALL _greeting(), not reference it as '$_greeting'
-          '${_greeting()} 👋',
-          style: TextStyle(
-            fontSize: 15,
-            color: AppColors.textSecondary,
-            fontWeight: FontWeight.w500,
+        // Premium Medusa Logo
+        Container(
+          width: 56,
+          height: 56,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            border: Border.all(
+              color: AppColors.accent.withValues(alpha: 0.3),
+              width: 2,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.accent.withValues(alpha: 0.15),
+                blurRadius: 15,
+                spreadRadius: 2,
+                offset: const Offset(0, 4),
+              ),
+            ],
+            image: const DecorationImage(
+              image: AssetImage('assets/images/medusa.jpg'),
+              fit: BoxFit.cover,
+            ),
           ),
         )
         .animate()
-        .fadeIn(duration: 400.ms)
-        .slideX(begin: -0.1, end: 0, duration: 400.ms),
+        .fadeIn(duration: 500.ms)
+        .scale(begin: const Offset(0.8, 0.8), curve: Curves.easeOutBack, duration: 500.ms),
         
-        const SizedBox(height: 4),
+        const SizedBox(width: 16),
         
-        Row(
-          children: [
-            const Text(
-              'Medusa',
-              style: TextStyle(
-                fontSize: 28,
-                fontWeight: FontWeight.w800,
-                color: AppColors.accent,
-              ),
-            ),
-            const SizedBox(width: 8),
-            const Text(
-              'Your Shield',
-              style: TextStyle(
-                fontSize: 28,
-                fontWeight: FontWeight.w700,
-                color: AppColors.textPrimary,
-              ),
-            ),
-          ],
-        )
-        .animate()
-        .fadeIn(delay: 100.ms, duration: 400.ms)
-        .slideX(begin: -0.1, end: 0, delay: 100.ms, duration: 400.ms),
-        
-        const SizedBox(height: 4),
-        
-        Text(
-          'Your phone. Your shield. Always.',
-          style: TextStyle(
-            fontSize: 14,
-            color: AppColors.textSecondary,
-            fontStyle: FontStyle.italic,
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Text(
+                    'Medusa',
+                    style: TextStyle(
+                      fontSize: 26,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.accent,
+                      letterSpacing: -0.5,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Shield',
+                    style: TextStyle(
+                      fontSize: 26,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textPrimary,
+                      letterSpacing: -0.5,
+                    ),
+                  ),
+                ],
+              )
+              .animate()
+              .fadeIn(delay: 100.ms, duration: 400.ms)
+              .slideX(begin: -0.05, end: 0, delay: 100.ms, duration: 400.ms),
+              
+              const SizedBox(height: 2),
+              
+              Text(
+                'Your phone. Your shield. Always.',
+                style: TextStyle(
+                  fontSize: 13,
+                  color: AppColors.textSecondary,
+                  fontStyle: FontStyle.italic,
+                  letterSpacing: 0.2,
+                ),
+              )
+              .animate()
+              .fadeIn(delay: 200.ms, duration: 400.ms),
+            ],
           ),
-        )
-        .animate()
-        .fadeIn(delay: 200.ms, duration: 400.ms),
+        ),
       ],
     );
   }

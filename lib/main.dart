@@ -24,10 +24,19 @@ import 'core/services/scream_detection_service.dart';
 import 'features/voice_sos/services/voice_sos_service.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
+import 'core/services/supabase_service.dart';
 import 'core/services/fake_call_notification_service.dart';
+import 'features/area_safety/services/community_signal_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  try {
+    await SupabaseService.initialize();
+  } catch (e) {
+    debugPrint('Supabase initializion failed: $e');
+  }
 
   try {
     await initializeBackgroundService();
@@ -130,6 +139,18 @@ class _MedusaAppState extends State<MedusaApp> with WidgetsBindingObserver {
       });
     } catch (e) {
       debugPrint('FG task callback setup failed: $e');
+    }
+
+    // Listen for network reconnect to sync offline Supabase data
+    try {
+      Connectivity().onConnectivityChanged.listen((List<ConnectivityResult> results) {
+        if (!results.contains(ConnectivityResult.none)) {
+          SosHistoryService().syncOfflineEvents();
+          CommunitySignalService().syncOfflineSignals();
+        }
+      });
+    } catch (e) {
+      debugPrint('Connectivity listener setup failed: $e');
     }
   }
 
